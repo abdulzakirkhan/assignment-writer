@@ -1,0 +1,1448 @@
+"use client"
+import type React from "react"
+import { useState, useRef, useEffect, useId } from "react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Progress } from "@/components/ui/progress"
+import { Badge } from "@/components/ui/badge"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { useToast } from "@/components/ui/use-toast"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Upload,
+  FileText,
+  Eye,
+  MessageSquare,
+  CheckCircle,
+  AlertCircle,
+  Book,
+  Brain,
+  Sparkles,
+  Trash2,
+  Info,
+  Settings,
+  FileType,
+  Loader2,
+  ChevronRight,
+  Zap,
+  BookOpen,
+  BookMarked,
+  FileSymlink,
+  Files,
+  Copy,
+  RefreshCw,
+} from "lucide-react"
+import { cn } from "@/lib/utils"
+import { v4 as uuidv4 } from "uuid"
+import { useChat } from "ai/react"
+import { processFile } from "@/lib/file-utils"
+import { generateMockAssignment } from "@/lib/mock-assignment"
+import type {
+  AssignmentDetails,
+  FileCategory,
+  FileInfo,
+  GenerationSettings,
+  RegenerationOptions,
+} from "@/types/assignment"
+import { REFERENCE_STYLES } from "@/types/assignment"
+import { downloadAsText, downloadAsHTML, downloadAsDocx, copyToClipboard } from "@/lib/document-utils"
+
+const AIAssignmentWriter = () => {
+  const { toast } = useToast()
+  const chatContainerRef = useRef<HTMLDivElement>(null)
+  const assignmentBriefInputRef = useRef<HTMLInputElement>(null)
+  const moduleInputRef = useRef<HTMLInputElement>(null)
+  const readingListInputRef = useRef<HTMLInputElement>(null)
+  const otherInputRef = useRef<HTMLInputElement>(null)
+
+  // State
+  const [activeTab, setActiveTab] = useState("upload")
+  const [uploadedFiles, setUploadedFiles] = useState<FileInfo[]>([])
+  const [assignmentGenerated, setAssignmentGenerated] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [generationProgress, setGenerationProgress] = useState(0)
+  const [assignment, setAssignment] = useState<AssignmentDetails | null>(null)
+  const [selectedSection, setSelectedSection] = useState<string | null>(null)
+  const [generationSettings, setGenerationSettings] = useState<GenerationSettings>({
+    academicStyle: true,
+    includeCitations: true,
+    includeExamples: true,
+    addConclusion: true,
+    wordCount: 2000,
+    referenceStyle: "Harvard",
+    additionalInstructions: "",
+    copies: 1,
+  })
+  const [regenerationOptions, setRegenerationOptions] = useState<RegenerationOptions>({
+    changeStyle: false,
+    adjustWordCount: false,
+    addReferences: false,
+    changeFocus: false,
+  })
+  const [chatInput, setChatInput] = useState("")
+  const [isProcessingChat, setIsProcessingChat] = useState(false)
+  const [debugMode, setDebugMode] = useState(false)
+  const [useMockData, setUseMockData] = useState(false)
+  const [isDownloading, setIsDownloading] = useState(false)
+  const [apiError, setApiError] = useState<string | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
+
+  // AI Chat integration
+  const { messages, append, isLoading } = useChat({
+    api: "/api/chat",
+    body: {
+      assignment,
+    },
+    onResponse: () => {
+      setIsProcessingChat(false)
+    },
+    onError: (error) => {
+      toast({
+        title: "Chat Error",
+        description: error.message || "Failed to get a response. Please try again.",
+        variant: "destructive",
+      })
+      setIsProcessingChat(false)
+    },
+  })
+
+  // File upload handler
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, category: FileCategory) => {
+    if (!event.target.files?.length) return
+
+    const files = Array.from(event.target.files)
+
+    // Create temporary file entries with uploading status
+    const tempFiles: FileInfo[] = files.map((file) => ({
+      id: uuidv4(),
+      name: file.name,
+      size: `${(file.size / 1024).toFixed(2)} KB`,
+      type: file.type.includes("pdf") ? "PDF" : file.type.includes("doc") ? "DOC" : "TXT",
+      progress: 0,
+      status: "uploading",
+      category: category,
+    }))
+
+    setUploadedFiles((prev) => [...prev, ...tempFiles])
+
+    // Process each file
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      const tempFile = tempFiles[i]
+
+      // Simulate upload progress
+      const progressInterval = setInterval(() => {
+        setUploadedFiles((prev) =>
+          prev.map((f) => (f.id === tempFile.id && f.progress < 90 ? { ...f, progress: f.progress + 10 } : f)),
+        )
+      }, 300)
+
+      try {
+        // Process the file
+        const processedFile = await processFile(file, category)
+
+        // Update the file entry with the processed data
+        setUploadedFiles((prev) =>
+          prev.map((f) => (f.id === tempFile.id ? { ...processedFile, progress: 100, status: "complete" } : f)),
+        )
+
+        clearInterval(progressInterval)
+      } catch (error) {
+        console.error("Error processing file:", error)
+
+        // Update the file entry with error status
+        setUploadedFiles((prev) =>
+          prev.map((f) => (f.id === tempFile.id ? { ...f, progress: 100, status: "error" } : f)),
+        )
+
+        clearInterval(progressInterval)
+
+        toast({
+          title: "File Upload Error",
+          description: `Failed to process ${file.name}. Please try again.`,
+          variant: "destructive",
+        })
+      }
+    }
+  }
+
+  // Remove file handler
+  const removeFile = (id: string) => {
+    setUploadedFiles((prev) => prev.filter((file) => file.id !== id))
+  }
+
+  // Generate assignment handler
+  const generateAssignment = async () => {
+    // Reset error state
+    setApiError(null)
+
+    // Allow generation with no files if using mock data
+    if (uploadedFiles.length === 0 && !useMockData && !debugMode) {
+      toast({
+        title: "No Files",
+        description: "Please upload at least one file before generating an assignment.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsGenerating(true)
+    setGenerationProgress(0)
+
+    // Simulate initial progress
+    const progressInterval = setInterval(() => {
+      setGenerationProgress((prev) => {
+        if (prev >= 90) {
+          clearInterval(progressInterval)
+          return prev
+        }
+        return prev + Math.random() * 2 // Slower progress to avoid jumping to 90% too quickly
+      })
+    }, 800)
+
+    try {
+      console.log("Starting assignment generation with files:", uploadedFiles.length)
+
+      // Prepare headers for the request
+      const headers = {
+        "Content-Type": "application/json",
+      }
+
+      // If debug mode is enabled and user clicked "Use Test Data", add a special header
+      if (debugMode && useMockData) {
+        headers["x-use-mock-data"] = "true"
+      }
+
+      // If we've had API errors and are in debug mode, use mock data as fallback
+      if (apiError && debugMode) {
+        console.log("Using mock data due to previous API error")
+        const mockAssignment = generateMockAssignment(generationSettings.referenceStyle, generationSettings.wordCount)
+
+        // Set generation progress to 100%
+        setGenerationProgress(100)
+
+        // Update state
+        setAssignment(mockAssignment)
+        setAssignmentGenerated(true)
+
+        // Switch to preview tab
+        setTimeout(() => {
+          setActiveTab("preview")
+          setIsGenerating(false)
+        }, 1000)
+
+        toast({
+          title: "Assignment Generated (Mock Data)",
+          description: "Using sample data due to API issues. This is for demonstration purposes only.",
+        })
+
+        clearInterval(progressInterval)
+        return
+      }
+
+      const response = await fetch("/api/generate-assignment", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          files: uploadedFiles,
+          settings: generationSettings,
+          wordCount: generationSettings.wordCount,
+          referenceStyle: generationSettings.referenceStyle,
+          additionalInstructions: generationSettings.additionalInstructions,
+          copies: generationSettings.copies,
+        }),
+      })
+
+      console.log("API response status:", response.status)
+
+      // Handle non-OK responses
+      if (!response.ok) {
+        let errorMessage = `Error: ${response.status}`
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.details || errorData.error || errorMessage
+        } catch (e) {
+          // If we can't parse the error as JSON, just use the status code
+        }
+
+        // Set the API error state
+        setApiError(errorMessage)
+
+        throw new Error(errorMessage)
+      }
+
+      // Parse the response
+      const result = await response.json()
+      console.log("Assignment generated successfully")
+
+      // Set generation progress to 100%
+      setGenerationProgress(100)
+
+      // Process the assignment data
+      const assignmentData = {
+        ...result,
+        createdAt: new Date(result.createdAt || new Date()),
+        format: "DOCX",
+        referenceStyle: result.referenceStyle || generationSettings.referenceStyle,
+      }
+
+      // Update state
+      setAssignment(assignmentData)
+      setAssignmentGenerated(true)
+
+      // Switch to preview tab
+      setTimeout(() => {
+        setActiveTab("preview")
+        setIsGenerating(false)
+      }, 1000)
+
+      toast({
+        title: "Assignment Generated",
+        description: "Your assignment has been successfully generated!",
+      })
+    } catch (error) {
+      console.error("Error generating assignment:", error)
+
+      clearInterval(progressInterval)
+      setIsGenerating(false)
+
+      // Show error toast
+      toast({
+        title: "Generation Failed",
+        description: error instanceof Error ? error.message : "Failed to generate the assignment. Please try again.",
+        variant: "destructive",
+        action: (
+          <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setRetryCount((prev) => prev + 1)
+                generateAssignment()
+              }}
+            >
+              <RefreshCw className="h-4 w-4 mr-1" />
+              Retry
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setUseMockData(true)
+                generateAssignment()
+              }}
+            >
+              Use Sample Data
+            </Button>
+          </div>
+        ),
+      })
+
+      // If we're in debug mode, offer to use mock data
+      if (debugMode) {
+        toast({
+          title: "Try Mock Data",
+          description: "Click 'Use Test Data' in the debug panel to generate a sample assignment.",
+          action: (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setUseMockData(true)
+                generateAssignment()
+              }}
+            >
+              Use Test Data
+            </Button>
+          ),
+        })
+      }
+    }
+  }
+
+  // Use mock data as fallback if API fails
+  const useMockDataFallback = () => {
+    setUseMockData(true)
+    generateAssignment()
+  }
+
+  // Chat handlers
+  const handleChatSubmit = async () => {
+    if (!chatInput.trim() || isProcessingChat) return
+
+    setIsProcessingChat(true)
+
+    try {
+      await append({
+        role: "user",
+        content: chatInput,
+      })
+
+      setChatInput("")
+    } catch (error) {
+      console.error("Chat error:", error)
+      setIsProcessingChat(false)
+
+      toast({
+        title: "Chat Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Download assignment with multiple format options
+  const handleDownload = async (format: "txt" | "html" | "docx" | "copy" = "docx") => {
+    if (!assignment) return
+
+    setIsDownloading(true)
+
+    try {
+      toast({
+        title: format === "copy" ? "Copying..." : "Preparing Download...",
+        description:
+          format === "copy"
+            ? "Copying assignment to clipboard."
+            : `Preparing your assignment for download as ${format.toUpperCase()}.`,
+      })
+
+      switch (format) {
+        case "txt":
+          downloadAsText(assignment)
+          break
+        case "html":
+          downloadAsHTML(assignment)
+          break
+        case "docx":
+          await downloadAsDocx(assignment)
+          break
+        case "copy":
+          const success = await copyToClipboard(assignment)
+          if (success) {
+            toast({
+              title: "Copied to Clipboard",
+              description: "Your assignment has been copied to the clipboard.",
+            })
+          } else {
+            toast({
+              title: "Copy Failed",
+              description: "Failed to copy to clipboard. Please try downloading instead.",
+              variant: "destructive",
+            })
+          }
+          break
+      }
+
+      if (format !== "copy") {
+        toast({
+          title: "Download Complete",
+          description: `Your assignment has been downloaded as a ${format.toUpperCase()} file.`,
+        })
+      }
+    } catch (error) {
+      console.error("Download error:", error)
+      toast({
+        title: "Download Error",
+        description: `Failed to download as ${format.toUpperCase()}. Please try another format.`,
+        variant: "destructive",
+      })
+    } finally {
+      setIsDownloading(false)
+    }
+  }
+
+  // Regenerate assignment
+  const regenerateAssignment = async () => {
+    if (!assignment) return
+
+    toast({
+      title: "Regenerating",
+      description: "Your assignment is being regenerated with the selected options.",
+    })
+
+    setIsGenerating(true)
+    setGenerationProgress(0)
+    setActiveTab("generate")
+
+    // Simulate regeneration
+    setTimeout(() => {
+      generateAssignment()
+    }, 1000)
+  }
+
+  // Scroll to bottom of chat when new messages arrive
+  useEffect(() => {
+    if (chatContainerRef.current && activeTab === "chat") {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
+    }
+  }, [messages, activeTab])
+
+  // Helper function to get file count by category
+  const getFilesCountByCategory = (category: FileCategory) => {
+    return uploadedFiles.filter((file) => file.category === category).length
+  }
+
+  // Helper function to trigger file input click
+  const triggerFileInput = (inputRef: React.RefObject<HTMLInputElement>) => {
+    if (inputRef.current) {
+      inputRef.current.click()
+    }
+  }
+
+  const toggleDebugMode = () => {
+    setDebugMode((prev) => !prev)
+    toast({
+      title: debugMode ? "Debug Mode Disabled" : "Debug Mode Enabled",
+      description: debugMode
+        ? "Debug information will no longer be displayed."
+        : "Debug information will be displayed in the console and UI.",
+    })
+  }
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-blue-50">
+      {/* Header */}
+      <header className="bg-white shadow-md border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="bg-gradient-to-r from-violet-600 to-indigo-600 p-2.5 rounded-xl">
+                <Brain className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">
+                  AI Assignment Writer
+                </h1>
+                <p className="text-slate-600 text-xs">Intelligent Academic Content Generation</p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <Sparkles className="h-4 w-4 text-amber-500" />
+                <span className="text-xs font-medium text-slate-700">Powered by Google Gemini</span>
+              </div>
+              <Button variant="ghost" size="sm" className="text-xs" onClick={toggleDebugMode}>
+                {debugMode ? "Disable Debug" : "Enable Debug"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        {/* Main Tabs */}
+        <Tabs defaultValue="upload" value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid grid-cols-4 w-full max-w-3xl mx-auto mb-8">
+            <TabsTrigger value="upload" className="flex items-center space-x-2">
+              <Upload className="h-4 w-4" />
+              <span>Upload</span>
+            </TabsTrigger>
+            <TabsTrigger value="generate" className="flex items-center space-x-2">
+              <FileText className="h-4 w-4" />
+              <span>Generate</span>
+            </TabsTrigger>
+            <TabsTrigger value="preview" className="flex items-center space-x-2">
+              <Eye className="h-4 w-4" />
+              <span>Preview</span>
+            </TabsTrigger>
+            <TabsTrigger value="chat" className="flex items-center space-x-2">
+              <MessageSquare className="h-4 w-4" />
+              <span>Q&A Chat</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Upload Tab Content */}
+          <TabsContent value="upload">
+            <div className="grid md:grid-cols-2 gap-8">
+              <div className="space-y-6">
+                {/* Assignment Brief Upload */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center">
+                      <FileSymlink className="h-5 w-5 mr-2 text-violet-600" />
+                      Assignment Brief
+                    </CardTitle>
+                    <CardDescription>Upload your assignment requirements and instructions</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 hover:border-violet-500 transition-colors">
+                      <input
+                        type="file"
+                        multiple
+                        onChange={(e) => handleFileUpload(e, "assignment-brief")}
+                        className="hidden"
+                        id="assignment-brief-upload"
+                        ref={assignmentBriefInputRef}
+                        accept=".pdf,.doc,.docx,.txt"
+                      />
+                      <div
+                        className="text-center cursor-pointer"
+                        onClick={() => triggerFileInput(assignmentBriefInputRef)}
+                      >
+                        <FileText className="mx-auto h-8 w-8 text-violet-500 mb-2" />
+                        <p className="text-sm font-medium text-slate-700">Upload Assignment Brief</p>
+                        <p className="text-xs text-slate-500 mt-1">PDF, DOC, DOCX, TXT</p>
+
+                        {getFilesCountByCategory("assignment-brief") > 0 && (
+                          <Badge variant="secondary" className="mt-2">
+                            {getFilesCountByCategory("assignment-brief")} file(s) uploaded
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Module Material Upload */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center">
+                      <BookMarked className="h-5 w-5 mr-2 text-emerald-600" />
+                      Module Material
+                    </CardTitle>
+                    <CardDescription>Upload lecture notes, slides, and course materials</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 hover:border-emerald-500 transition-colors">
+                      <input
+                        type="file"
+                        multiple
+                        onChange={(e) => handleFileUpload(e, "module-material")}
+                        className="hidden"
+                        id="module-material-upload"
+                        ref={moduleInputRef}
+                        accept=".pdf,.doc,.docx,.txt"
+                      />
+                      <div className="text-center cursor-pointer" onClick={() => triggerFileInput(moduleInputRef)}>
+                        <Book className="mx-auto h-8 w-8 text-emerald-500 mb-2" />
+                        <p className="text-sm font-medium text-slate-700">Upload Module Material</p>
+                        <p className="text-xs text-slate-500 mt-1">PDF, DOC, DOCX, TXT</p>
+
+                        {getFilesCountByCategory("module-material") > 0 && (
+                          <Badge variant="secondary" className="mt-2">
+                            {getFilesCountByCategory("module-material")} file(s) uploaded
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Reading List Upload */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center">
+                      <BookOpen className="h-5 w-5 mr-2 text-amber-600" />
+                      Reading List
+                    </CardTitle>
+                    <CardDescription>Upload reference papers, articles, and books</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 hover:border-amber-500 transition-colors">
+                      <input
+                        type="file"
+                        multiple
+                        onChange={(e) => handleFileUpload(e, "reading-list")}
+                        className="hidden"
+                        id="reading-list-upload"
+                        ref={readingListInputRef}
+                        accept=".pdf,.doc,.docx,.txt"
+                      />
+                      <div className="text-center cursor-pointer" onClick={() => triggerFileInput(readingListInputRef)}>
+                        <Files className="mx-auto h-8 w-8 text-amber-500 mb-2" />
+                        <p className="text-sm font-medium text-slate-700">Upload Reading List</p>
+                        <p className="text-xs text-slate-500 mt-1">PDF, DOC, DOCX, TXT</p>
+
+                        {getFilesCountByCategory("reading-list") > 0 && (
+                          <Badge variant="secondary" className="mt-2">
+                            {getFilesCountByCategory("reading-list")} file(s) uploaded
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Other Files Upload */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center">
+                      <Files className="h-5 w-5 mr-2 text-blue-600" />
+                      Other Files
+                    </CardTitle>
+                    <CardDescription>Upload any additional supporting documents</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 hover:border-blue-500 transition-colors">
+                      <input
+                        type="file"
+                        multiple
+                        onChange={(e) => handleFileUpload(e, "other")}
+                        className="hidden"
+                        id="other-upload"
+                        ref={otherInputRef}
+                        accept=".pdf,.doc,.docx,.txt"
+                      />
+                      <div className="text-center cursor-pointer" onClick={() => triggerFileInput(otherInputRef)}>
+                        <Upload className="mx-auto h-8 w-8 text-blue-500 mb-2" />
+                        <p className="text-sm font-medium text-slate-700">Upload Other Files</p>
+                        <p className="text-xs text-slate-500 mt-1">PDF, DOC, DOCX, TXT</p>
+
+                        {getFilesCountByCategory("other") > 0 && (
+                          <Badge variant="secondary" className="mt-2">
+                            {getFilesCountByCategory("other")} file(s) uploaded
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Uploaded Files</CardTitle>
+                    <CardDescription>
+                      {uploadedFiles.length === 0
+                        ? "No files uploaded yet"
+                        : `${uploadedFiles.length} file(s) uploaded`}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {uploadedFiles.length === 0 ? (
+                      <div className="text-center py-12 border border-dashed border-slate-200 rounded-lg">
+                        <FileText className="mx-auto h-12 w-12 text-slate-300 mb-3" />
+                        <p className="text-slate-500 text-sm">No files uploaded yet</p>
+                        <p className="text-slate-400 text-xs mt-1">Upload files to get started</p>
+                      </div>
+                    ) : (
+                      <ScrollArea className="h-[350px] pr-4">
+                        <div className="space-y-3">
+                          {uploadedFiles.map((file) => (
+                            <div
+                              key={file.id}
+                              className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100"
+                            >
+                              <div className="flex items-center space-x-3">
+                                <div
+                                  className={cn(
+                                    "w-10 h-10 rounded-lg flex items-center justify-center",
+                                    file.category === "assignment-brief"
+                                      ? "bg-violet-100"
+                                      : file.category === "module-material"
+                                        ? "bg-emerald-100"
+                                        : file.category === "reading-list"
+                                          ? "bg-amber-100"
+                                          : "bg-blue-100",
+                                  )}
+                                >
+                                  {file.type === "PDF" ? (
+                                    <FileType
+                                      className={cn(
+                                        "h-5 w-5",
+                                        file.category === "assignment-brief"
+                                          ? "text-violet-600"
+                                          : file.category === "module-material"
+                                            ? "text-emerald-600"
+                                            : file.category === "reading-list"
+                                              ? "text-amber-600"
+                                              : "text-blue-600",
+                                      )}
+                                    />
+                                  ) : file.type === "DOC" ? (
+                                    <FileText
+                                      className={cn(
+                                        "h-5 w-5",
+                                        file.category === "assignment-brief"
+                                          ? "text-violet-600"
+                                          : file.category === "module-material"
+                                            ? "text-emerald-600"
+                                            : file.category === "reading-list"
+                                              ? "text-amber-600"
+                                              : "text-blue-600",
+                                      )}
+                                    />
+                                  ) : (
+                                    <BookOpen
+                                      className={cn(
+                                        "h-5 w-5",
+                                        file.category === "assignment-brief"
+                                          ? "text-violet-600"
+                                          : file.category === "module-material"
+                                            ? "text-emerald-600"
+                                            : file.category === "reading-list"
+                                              ? "text-amber-600"
+                                              : "text-blue-600",
+                                      )}
+                                    />
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="font-medium text-slate-800 text-sm">{file.name}</p>
+                                  <div className="flex items-center space-x-2 mt-1">
+                                    <Badge variant="outline" className="text-xs px-1.5 py-0 h-5">
+                                      {file.type}
+                                    </Badge>
+                                    <Badge variant="secondary" className="text-xs px-1.5 py-0 h-5">
+                                      {file.category === "assignment-brief"
+                                        ? "Brief"
+                                        : file.category === "module-material"
+                                          ? "Module"
+                                          : file.category === "reading-list"
+                                            ? "Reading"
+                                            : "Other"}
+                                    </Badge>
+                                    <span className="text-xs text-slate-500">{file.size}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                {file.status === "uploading" ? (
+                                  <div className="w-20">
+                                    <Progress value={file.progress} className="h-1.5" />
+                                  </div>
+                                ) : file.status === "complete" ? (
+                                  <CheckCircle className="h-4 w-4 text-green-500" />
+                                ) : (
+                                  <AlertCircle className="h-4 w-4 text-red-500" />
+                                )}
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 rounded-full"
+                                  onClick={() => removeFile(file.id)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 text-slate-400" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    )}
+
+                    <div className="mt-4 flex space-x-2">
+                      <Button
+                        className="flex-1 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
+                        onClick={() => setActiveTab("generate")}
+                        disabled={uploadedFiles.length === 0 && !debugMode}
+                      >
+                        Continue to Generate
+                        <ChevronRight className="ml-2 h-4 w-4" />
+                      </Button>
+
+                      {debugMode && (
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setUseMockData(true)
+                            setActiveTab("generate")
+                          }}
+                        >
+                          Use Test Data
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {(uploadedFiles.length > 0 || debugMode) && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Assignment Settings</CardTitle>
+                      <CardDescription>Configure your assignment generation settings</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Word Count */}
+                      <div className="space-y-2">
+                        <Label htmlFor="word-count">Word Count</Label>
+                        <div className="flex items-center space-x-2">
+                          <Input
+                            id="word-count"
+                            type="number"
+                            value={generationSettings.wordCount}
+                            onChange={(e) =>
+                              setGenerationSettings({
+                                ...generationSettings,
+                                wordCount: Number.parseInt(e.target.value) || 1000,
+                              })
+                            }
+                            min={500}
+                            max={10000}
+                            step={100}
+                          />
+                          <span className="text-sm text-slate-500">words</span>
+                        </div>
+                      </div>
+
+                      {/* Reference Style */}
+                      <div className="space-y-2">
+                        <Label htmlFor="reference-style">Reference Style</Label>
+                        <Select
+                          value={generationSettings.referenceStyle}
+                          onValueChange={(value) =>
+                            setGenerationSettings({
+                              ...generationSettings,
+                              referenceStyle: value,
+                            })
+                          }
+                        >
+                          <SelectTrigger id="reference-style">
+                            <SelectValue placeholder="Select a reference style" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {REFERENCE_STYLES.map((style) => (
+                              <SelectItem key={style} value={style}>
+                                {style}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Number of Copies */}
+                      <div className="space-y-2">
+                        <Label htmlFor="copies">Number of Copies</Label>
+                        <div className="flex items-center space-x-2">
+                          <Input
+                            id="copies"
+                            type="number"
+                            value={generationSettings.copies}
+                            onChange={(e) =>
+                              setGenerationSettings({
+                                ...generationSettings,
+                                copies: Number.parseInt(e.target.value) || 1,
+                              })
+                            }
+                            min={1}
+                            max={5}
+                          />
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <Info className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">Generate multiple unique versions of the assignment</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      </div>
+
+                      {/* Additional Instructions */}
+                      <div className="space-y-2">
+                        <Label htmlFor="instructions">Additional Instructions</Label>
+                        <Textarea
+                          id="instructions"
+                          placeholder="Enter any specific requirements or preferences..."
+                          value={generationSettings.additionalInstructions}
+                          onChange={(e) =>
+                            setGenerationSettings({
+                              ...generationSettings,
+                              additionalInstructions: e.target.value,
+                            })
+                          }
+                          className="min-h-[100px]"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Generate Tab Content */}
+          <TabsContent value="generate">
+            <Card className="max-w-3xl mx-auto">
+              <CardContent className="p-8">
+                <div className="text-center mb-8">
+                  <div className="mx-auto w-20 h-20 bg-gradient-to-br from-emerald-100 to-sky-100 rounded-full flex items-center justify-center mb-5">
+                    <Sparkles className="h-10 w-10 text-emerald-600" />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-800 mb-2">Generate Assignment</h3>
+                  <p className="text-slate-600 text-sm max-w-md mx-auto">
+                    Our AI will analyze your uploaded files and generate a comprehensive, well-structured assignment
+                  </p>
+                </div>
+
+                {apiError && (
+                  <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-start space-x-3">
+                      <AlertCircle className="h-5 w-5 text-red-500 mt-0.5" />
+                      <div>
+                        <h4 className="text-sm font-medium text-red-800">API Error Detected</h4>
+                        <p className="text-xs text-red-700 mt-1">{apiError}</p>
+                        <div className="mt-3 flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs bg-white"
+                            onClick={() => {
+                              setApiError(null)
+                              setRetryCount((prev) => prev + 1)
+                              generateAssignment()
+                            }}
+                          >
+                            <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                            Retry
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs bg-white"
+                            onClick={useMockDataFallback}
+                          >
+                            Use Sample Data
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {!assignmentGenerated && !isGenerating && (
+                  <div className="space-y-6">
+                    <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                      <h4 className="text-sm font-medium text-slate-800 mb-3 flex items-center">
+                        <Settings className="h-4 w-4 mr-2 text-slate-600" />
+                        Generation Settings
+                      </h4>
+
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="academic"
+                              checked={generationSettings.academicStyle}
+                              onCheckedChange={(checked) =>
+                                setGenerationSettings({ ...generationSettings, academicStyle: !!checked })
+                              }
+                            />
+                            <label htmlFor="academic" className="text-xs text-slate-700">
+                              Academic style
+                            </label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="citations"
+                              checked={generationSettings.includeCitations}
+                              onCheckedChange={(checked) =>
+                                setGenerationSettings({ ...generationSettings, includeCitations: !!checked })
+                              }
+                            />
+                            <label htmlFor="citations" className="text-xs text-slate-700">
+                              Include citations
+                            </label>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="examples"
+                              checked={generationSettings.includeExamples}
+                              onCheckedChange={(checked) =>
+                                setGenerationSettings({ ...generationSettings, includeExamples: !!checked })
+                              }
+                            />
+                            <label htmlFor="examples" className="text-xs text-slate-700">
+                              Include examples
+                            </label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="conclusion"
+                              checked={generationSettings.addConclusion}
+                              onCheckedChange={(checked) =>
+                                setGenerationSettings({ ...generationSettings, addConclusion: !!checked })
+                              }
+                            />
+                            <label htmlFor="conclusion" className="text-xs text-slate-700">
+                              Add conclusion
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-slate-700">Word Count</label>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              value={generationSettings.wordCount}
+                              onChange={(e) =>
+                                setGenerationSettings({
+                                  ...generationSettings,
+                                  wordCount: Number.parseInt(e.target.value) || 1000,
+                                })
+                              }
+                              className="h-8 text-xs"
+                              type="number"
+                              min={500}
+                              max={10000}
+                            />
+                            <span className="text-xs text-slate-500">words</span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-slate-700">Reference Style</label>
+                          <Select
+                            value={generationSettings.referenceStyle}
+                            onValueChange={(value) =>
+                              setGenerationSettings({
+                                ...generationSettings,
+                                referenceStyle: value,
+                              })
+                            }
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Select style" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {REFERENCE_STYLES.map((style) => (
+                                <SelectItem key={style} value={style} className="text-xs">
+                                  {style}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 space-y-1">
+                        <label className="text-xs font-medium text-slate-700">Additional Instructions</label>
+                        <Textarea
+                          placeholder="Enter any specific requirements or preferences..."
+                          value={generationSettings.additionalInstructions}
+                          onChange={(e) =>
+                            setGenerationSettings({
+                              ...generationSettings,
+                              additionalInstructions: e.target.value,
+                            })
+                          }
+                          className="text-xs min-h-[60px]"
+                        />
+                      </div>
+
+                      <div className="mt-4 flex items-center space-x-4">
+                        <div className="space-y-1 flex-1">
+                          <label className="text-xs font-medium text-slate-700">Number of Copies</label>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              value={generationSettings.copies}
+                              onChange={(e) =>
+                                setGenerationSettings({
+                                  ...generationSettings,
+                                  copies: Number.parseInt(e.target.value) || 1,
+                                })
+                              }
+                              className="h-8 text-xs"
+                              type="number"
+                              min={1}
+                              max={5}
+                            />
+                            <div className="flex items-center space-x-1">
+                              <Copy className="h-3.5 w-3.5 text-slate-500" />
+                              <span className="text-xs text-slate-500">copies</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex-1">
+                          <div className="bg-amber-50 p-2 rounded-md border border-amber-100">
+                            <div className="flex items-start space-x-2">
+                              <Info className="h-3.5 w-3.5 text-amber-600 mt-0.5" />
+                              <p className="text-xs text-amber-800">
+                                Multiple copies will generate unique variations of the same assignment
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-center">
+                      <div className="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-3">
+                        <Button
+                          onClick={generateAssignment}
+                          disabled={
+                            (uploadedFiles.length === 0 && !useMockData && !debugMode) ||
+                            generationSettings.wordCount < 500
+                          }
+                          className="bg-gradient-to-r from-emerald-500 to-sky-500 hover:from-emerald-600 hover:to-sky-600 px-8 py-6 h-auto text-base"
+                        >
+                          <Zap className="mr-2 h-5 w-5" />
+                          Generate Assignment
+                        </Button>
+
+                        {debugMode && (
+                          <Button
+                            onClick={useMockDataFallback}
+                            variant="outline"
+                            className="px-8 py-6 h-auto text-base"
+                          >
+                            Use Sample Data
+                          </Button>
+                        )}
+                      </div>
+
+                      {uploadedFiles.length === 0 && !useMockData && !debugMode && (
+                        <p className="text-red-500 text-xs mt-3">Please upload files first</p>
+                      )}
+                      {generationSettings.wordCount < 500 && (
+                        <p className="text-red-500 text-xs mt-3">Word count must be at least 500</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {isGenerating && (
+                  <div className="space-y-6">
+                    <div className="text-center">
+                      <div className="inline-flex items-center space-x-3 bg-sky-50 px-5 py-3 rounded-lg">
+                        <Loader2 className="h-5 w-5 text-sky-600 animate-spin" />
+                        <span className="text-sky-600 font-medium text-sm">Generating your assignment...</span>
+                      </div>
+                    </div>
+
+                    <Progress value={generationProgress} className="h-2" />
+
+                    <p className="text-slate-600 text-sm text-center">
+                      Please be patient, this may take a few minutes.
+                    </p>
+
+                    {debugMode && (
+                      <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                        <h4 className="text-xs font-semibold text-slate-700 mb-2">Debug Information</h4>
+                        <div className="space-y-1 text-xs text-slate-600">
+                          <p>API Key Status: {process.env.GOOGLE_GENERATIVE_AI_API_KEY ? "Available" : "Not Found"}</p>
+                          <p>Files Count: {uploadedFiles.length}</p>
+                          <p>Word Count: {generationSettings.wordCount}</p>
+                          <p>Reference Style: {generationSettings.referenceStyle}</p>
+                          <p>Retry Count: {retryCount}</p>
+                          <div className="flex space-x-2 mt-2">
+                            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={useMockDataFallback}>
+                              Use Sample Data
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {assignmentGenerated && assignment && (
+                  <div className="space-y-6">
+                    <div className="text-center">
+                      <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-3" />
+                      <h3 className="text-xl font-bold text-slate-800 mb-2">Assignment Generated!</h3>
+                      <p className="text-slate-600 text-sm">
+                        Your AI-generated assignment is ready for preview and download.
+                      </p>
+
+                      <div className="mt-6 flex justify-center space-x-3">
+                        <Button onClick={() => setActiveTab("preview")}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          View Assignment
+                        </Button>
+                        <Button variant="outline" onClick={() => handleDownload("docx")}>
+                          <FileText className="mr-2 h-4 w-4" />
+                          Download DOCX
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Preview Tab Content */}
+          <TabsContent value="preview">
+            {assignment ? (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-bold text-slate-800">Assignment Preview</h3>
+                  <div className="flex items-center space-x-3">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="outline" size="sm" onClick={() => handleDownload("copy")}>
+                            <Copy className="h-4 w-4 mr-2" />
+                            Copy Text
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Copy the assignment text to clipboard</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <Button variant="secondary" size="sm" onClick={() => handleDownload("txt")}>
+                      Download TXT
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={() => handleDownload("html")}>
+                      Download HTML
+                    </Button>
+                    <Button variant="primary" size="sm" onClick={() => handleDownload("docx")}>
+                      Download DOCX
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+                  <ScrollArea className="h-[500px] pr-4">
+                    <div className="p-6 prose max-w-none">
+                      <h2 className="text-2xl font-bold text-center mb-4">{assignment.title}</h2>
+
+                      {assignment.sections &&
+                        assignment.sections.map((section) => (
+                          <div key={section.id} className="mb-8">
+                            <h4 className="text-lg font-semibold text-slate-800 mb-3">{section.title}</h4>
+                            {section.content.split("\n\n").map((paragraph, idx) => (
+                              <p key={idx} className="text-slate-700 mb-4">
+                                {paragraph}
+                              </p>
+                            ))}
+                          </div>
+                        ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <Button variant="outline" onClick={() => setActiveTab("generate")}>
+                    Back to Generate
+                  </Button>
+                  <Button variant="destructive" onClick={regenerateAssignment}>
+                    Regenerate Assignment
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-24">
+                <FileText className="mx-auto h-12 w-12 text-slate-300 mb-3" />
+                <p className="text-slate-500 text-sm">No assignment generated yet</p>
+                <p className="text-slate-400 text-xs mt-1">Generate an assignment to preview it here</p>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Chat Tab Content */}
+          <TabsContent value="chat">
+            <div className="space-y-4">
+              <div
+                ref={chatContainerRef}
+                className="h-[500px] p-4 bg-slate-50 rounded-lg border border-slate-200 overflow-y-auto"
+              >
+                {messages.length === 0 ? (
+                  <div className="text-center py-24">
+                    <MessageSquare className="mx-auto h-12 w-12 text-slate-300 mb-3" />
+                    <p className="text-slate-500 text-sm">No messages yet</p>
+                    <p className="text-slate-400 text-xs mt-1">Start a conversation to get help</p>
+                  </div>
+                ) : (
+                  messages.map((message, index) => (
+                    <div
+                      key={index}
+                      className={`mb-3 p-3 rounded-lg ${message.role === "user" ? "bg-blue-100" : "bg-slate-100"}`}
+                    >
+                      <p className="text-sm text-slate-800">{message.content}</p>
+                    </div>
+                  ))
+                )}
+
+                {isLoading && (
+                  <div className="mb-3 p-3 rounded-lg bg-slate-100">
+                    <Loader2 className="h-4 w-4 text-slate-600 animate-spin mr-2 inline-block" />
+                    <span className="text-sm text-slate-800">Thinking...</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center space-x-3">
+                <Input
+                  type="text"
+                  placeholder="Ask a question about the assignment..."
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleChatSubmit()
+                    }
+                  }}
+                />
+                <Button onClick={handleChatSubmit} disabled={isProcessingChat}>
+                  {isProcessingChat ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send"}
+                </Button>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* Debug Panel */}
+      {debugMode && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Debug Panel</CardTitle>
+              <CardDescription>Information for debugging and testing purposes.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="debug-mode">Debug Mode</Label>
+                <Checkbox checked={debugMode} onCheckedChange={toggleDebugMode} id="debug-mode" />
+              </div>
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="use-test-data">Use Test Data</Label>
+                <Checkbox checked={useMockData} onCheckedChange={setUseMockData} id="use-test-data" />
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button variant="outline" size="sm" onClick={useMockDataFallback}>
+                  Generate with Sample Data
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setApiError(null)
+                    setRetryCount((prev) => prev + 1)
+                    generateAssignment()
+                  }}
+                >
+                  Retry API Call
+                </Button>
+              </div>
+              <div>
+                <p>API Error:</p>
+                <pre className="bg-slate-100 p-2 rounded text-xs">{apiError || "None"}</pre>
+              </div>
+              <div>
+                <p>Uploaded Files:</p>
+                <pre className="bg-slate-100 p-2 rounded text-xs">
+                  {JSON.stringify(uploadedFiles.length, null, 2)} files
+                </pre>
+              </div>
+              <div>
+                <p>Generation Settings:</p>
+                <pre className="bg-slate-100 p-2 rounded text-xs">{JSON.stringify(generationSettings, null, 2)}</pre>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default AIAssignmentWriter

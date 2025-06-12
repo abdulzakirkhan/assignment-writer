@@ -1,0 +1,290 @@
+"use client";
+import { useState } from 'react';
+import Head from 'next/head';
+
+export default function SignIn() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [authMethod, setAuthMethod] = useState('password');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    // Authentication logic here
+    setTimeout(() => setIsLoading(false), 2000);
+  };
+
+  return (
+    <div className="min-h-screen bg-galaxy bg-cover bg-center flex items-center justify-center p-4 overflow-hidden">
+      <Head>
+        <title>Ai-Assignment Writer</title>
+      </Head>
+
+      {/* Background elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-cyan-500 rounded-full filter blur-[100px] opacity-20 animate-float1"></div>
+        <div className="absolute top-2/3 right-1/3 w-80 h-80 bg-purple-500 rounded-full filter blur-[120px] opacity-15 animate-float2"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-72 h-72 bg-indigo-500 rounded-full filter blur-[90px] opacity-15 animate-float3"></div>
+      </div>
+
+      {/* Main card */}
+      <div className="relative z-10 w-full max-w-md backdrop-blur-xl bg-opacity-30 bg-gray-900 border border-opacity-30 border-gray-500 rounded-2xl shadow-2xl overflow-hidden transition-all duration-500 hover:shadow-neon">
+        {/* Holographic header */}
+        <div className="relative h-3 bg-gradient-to-r from-cyan-400 via-purple-500 to-indigo-500">
+          <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 via-purple-500 to-indigo-500 opacity-70 animate-pulse"></div>
+        </div>
+
+        <div className="p-8">
+          {/* Logo/Title */}
+          <div className="flex flex-col items-center mb-8">
+            <div className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-indigo-500 mb-2">
+              AI-Assignment Writer
+            </div>
+            <div className="text-gray-400 text-sm">AUTHENTICATION</div>
+          </div>
+
+          {/* Auth method selector */}
+          <div className="flex justify-center mb-8">
+            <div className="inline-flex bg-gray-800 bg-opacity-50 rounded-full p-1">
+              <button
+                onClick={() => setAuthMethod('password')}
+                className={`px-4 py-2 text-sm rounded-full transition-all ${authMethod === 'password' ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-white'}`}
+              >
+                Password
+              </button>
+              {/* <button
+                onClick={() => setAuthMethod('biometric')}
+                className={`px-4 py-2 text-sm rounded-full transition-all ${authMethod === 'biometric' ? 'bg-purple-500 text-white' : 'text-gray-400 hover:text-white'}`}
+              >
+                Biometric
+              </button>
+              <button
+                onClick={() => setAuthMethod('neural')}
+                className={`px-4 py-2 text-sm rounded-full transition-all ${authMethod === 'neural' ? 'bg-indigo-500 text-white' : 'text-gray-400 hover:text-white'}`}
+              >
+                Neural Link
+              </button> */}
+            </div>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit}>
+            {authMethod === 'password' && (
+              <div className="space-y-5">
+                <div className="relative">
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-800 bg-opacity-50 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-white placeholder-gray-500 transition-all"
+                    placeholder="Quantum Mail Address"
+                    required
+                  />
+                  <div className="absolute right-3 top-3 text-gray-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+                      <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="relative">
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-800 bg-opacity-50 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-white placeholder-gray-500 transition-all"
+                    placeholder="Encryption Key"
+                    required
+                  />
+                  <div className="absolute right-3 top-3 text-gray-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {authMethod === 'biometric' && (
+              <div className="flex flex-col items-center py-8">
+                <div className="relative mb-6">
+                  <div className="w-32 h-32 rounded-full border-4 border-cyan-500 flex items-center justify-center animate-pulse">
+                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-cyan-400 to-purple-500 opacity-30 animate-pulse"></div>
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
+                    </svg>
+                  </div>
+                </div>
+                <p className="text-gray-400 text-center mb-6">Scanning biometric signature...</p>
+                <button
+                  type="button"
+                  className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-purple-600 rounded-full text-white font-medium hover:opacity-90 transition-all focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-900"
+                >
+                  Initiate Scan
+                </button>
+              </div>
+            )}
+
+            {authMethod === 'neural' && (
+              <div className="flex flex-col items-center py-8">
+                <div className="relative mb-6">
+                  <div className="w-40 h-40 rounded-full border-2 border-indigo-500 flex items-center justify-center animate-pulse">
+                    <div className="absolute inset-0 rounded-full border-2 border-indigo-400 animate-ping opacity-20"></div>
+                    <div className="w-32 h-32 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 opacity-10"></div>
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-20 w-20 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
+                <p className="text-gray-400 text-center mb-6">Establishing neural connection...</p>
+                <button
+                  type="button"
+                  className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-700 rounded-full text-white font-medium hover:opacity-90 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900"
+                >
+                  Connect Neural Interface
+                </button>
+              </div>
+            )}
+
+            {authMethod === 'password' && (
+              <>
+                <div className="flex items-center justify-between mt-6 mb-6">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="remember"
+                      className="h-4 w-4 text-cyan-500 focus:ring-cyan-500 border-gray-700 rounded bg-gray-800"
+                    />
+                    <label htmlFor="remember" className="ml-2 block text-sm text-gray-400">
+                      Remember this device
+                    </label>
+                  </div>
+                  <div>
+                    <a href="#" className="text-sm text-cyan-400 hover:text-cyan-300">
+                      Forgot encryption key?
+                    </a>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-lg text-white font-medium hover:opacity-90 transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? (
+                    <span className="flex items-center justify-center">
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Authenticating...
+                    </span>
+                  ) : (
+                    'Quantum Sign In'
+                  )}
+                </button>
+              </>
+            )}
+          </form>
+
+          <div className="mt-8 text-center text-sm text-gray-500">
+            New to NeoSystem?{' '}
+            <a href="#" className="text-cyan-400 hover:text-cyan-300 font-medium">
+              Create quantum account
+            </a>
+          </div>
+        </div>
+
+        {/* Holographic footer */}
+        <div className="relative h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400 opacity-70"></div>
+      </div>
+
+      {/* Floating particles */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {[...Array(20)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute rounded-full bg-white opacity-10"
+            style={{
+              width: `${Math.random() * 5 + 1}px`,
+              height: `${Math.random() * 5 + 1}px`,
+              top: `${Math.random() * 100}%`,
+              left: `${Math.random() * 100}%`,
+              animation: `float ${Math.random() * 20 + 10}s linear infinite`,
+              animationDelay: `${Math.random() * 5}s`,
+            }}
+          ></div>
+        ))}
+      </div>
+
+      {/* Global styles */}
+      <style jsx global>{`
+        @keyframes float {
+          0% {
+            transform: translateY(0) translateX(0);
+            opacity: 0;
+          }
+          10% {
+            opacity: 0.1;
+          }
+          100% {
+            transform: translateY(-100vh) translateX(${Math.random() > 0.5 ? '-' : ''}${Math.random() * 100}px);
+            opacity: 0;
+          }
+        }
+        
+        @keyframes float1 {
+          0%, 100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-20px);
+          }
+        }
+        
+        @keyframes float2 {
+          0%, 100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(15px);
+          }
+        }
+        
+        @keyframes float3 {
+          0%, 100% {
+            transform: translateY(0) translateX(0);
+          }
+          50% {
+            transform: translateY(-10px) translateX(10px);
+          }
+        }
+        
+        .bg-galaxy {
+          background-image: radial-gradient(circle at center, #0f172a 0%, #020617 100%);
+        }
+        
+        .shadow-neon {
+          box-shadow: 0 0 20px rgba(34, 211, 238, 0.3), 0 0 40px rgba(124, 58, 237, 0.2);
+        }
+        
+        .animate-float1 {
+          animation: float1 8s ease-in-out infinite;
+        }
+        
+        .animate-float2 {
+          animation: float2 10s ease-in-out infinite;
+        }
+        
+        .animate-float3 {
+          animation: float3 12s ease-in-out infinite;
+        }
+      `}</style>
+    </div>
+  );
+}
