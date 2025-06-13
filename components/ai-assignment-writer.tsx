@@ -55,6 +55,7 @@ import type {
   FileInfo,
   GenerationSettings,
   RegenerationOptions,
+  AssignmentSection,
 } from "@/types/assignment"
 import { REFERENCE_STYLES } from "@/types/assignment"
 import { downloadAsText, downloadAsHTML, downloadAsDocx, copyToClipboard } from "@/lib/document-utils"
@@ -529,6 +530,8 @@ const AIAssignmentWriter = () => {
 
 
   const filteredFile = uploadedFiles.find(file => file.category === "assignment-brief");
+  const moduleMaterial = uploadedFiles.find(file => file.category === "module-material");
+  const filesLength = uploadedFiles.length;
 
   useEffect(() => {
     if(!filteredFile){
@@ -536,8 +539,8 @@ const AIAssignmentWriter = () => {
       setAssignment(null)
       setAssignmentGenerated(false)
     }
-  }, [filteredFile])
 
+  }, [filteredFile,uploadedFiles])
 
   const [assignmentId, setAssignmentId] = useState(123456891011121314); // Example assignment ID, can be generated dynamically
   const [assignmentType, setAssignmentType] = useState("Essay"); // Default assignment type
@@ -553,7 +556,55 @@ const AIAssignmentWriter = () => {
       setAssignmentId(11);
     }
   }, [assignmentId])
+
+
+
+  const [isShowSection, setIsShowSection] = useState(false)
+  const [sectionData, setSectionData] = useState<AssignmentSection | null>(null)
+  const [editSectionText, setEditSectionText] = useState(sectionData?.content || "")
+
+  useEffect(() => {
+    if (sectionData !== null && sectionData.content !== undefined) {
+      setEditSectionText(sectionData.content)
+    }
+  }, [sectionData])
   
+  const SectionViewer = ({ section, onClose }: { section: any; onClose: () => void }) => {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-xs bg-black/20">
+        {/* Modal content */}
+        <div className="bg-white rounded-lg shadow-lg w-4xl h-[433px] max-w-full p-6 relative">
+
+            <Card key={section?.id} className="border-0 h-full">
+              <CardHeader className="px-0">
+                <CardTitle className="text-lg">{section?.title}</CardTitle>
+              </CardHeader>
+              <CardContent className="py-4 h-1/2 !overflow-y-auto rounded-md bg-slate-50 border border-slate-200">
+                  {section?.content.split("\n\n").map((paragraph: any, idx: number) => (
+                    <p key={idx} className="text-slate-700 mb-4">
+                      {paragraph}
+                    </p>
+                  ))}
+              </CardContent>
+              <CardFooter className="h-1/3 flex items-center gap-4">
+                {/* Close Button */}
+                <Button variant="outline" className="cursor-pointer" size="sm" onClick={onClose}>
+                  Close
+                </Button>
+                {/* Save Button */}
+                <Button variant="outline" className="cursor-pointer">Save</Button>
+                {/* Regenerate Button */}
+                <Button variant="outline" className="cursor-pointer" size="sm" onClick={() => regenerateAssignment()}>
+                  Regenerate
+                </Button>
+            </CardFooter>
+            </Card>
+        </div>
+      </div>
+    );
+  };
+
+  console.log("filesLength :",filesLength)
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-blue-50">
       {/* Header */}
@@ -609,7 +660,7 @@ const AIAssignmentWriter = () => {
           {/* Upload Tab Content */}
           <TabsContent value="upload">
             <>
-            <div className={`grid ${filteredFile ? "md:grid-cols-3" : "md:grid-cols-2"} gap-8`}>
+            <div className={`grid ${filesLength === 0 ? "md:grid-cols-2" : filesLength === 1 ? "md:grid-cols-3" : filesLength >= 2 ? "md:grid-cols-4" : "md:grid-cols-2"} gap-8`}>
                 {/* Assignment Brief Upload */}
                 <Card>
                   <CardHeader className="pb-3">
@@ -776,7 +827,59 @@ const AIAssignmentWriter = () => {
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-lg flex items-center">
-                        <FileTextIcon className="h-5 w-5 mr-2 text-amber-600" />
+                        <FileTextIcon className="h-5 w-5 mr-2 text-violet-600" />
+                        Provided Assignment
+                      </CardTitle>
+                      <CardDescription>Provided reference, papers topic, paper type deadline</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 space-y-3">
+                        {/* Paper Topic row */}
+                        <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
+                          <span className="text-sm text-gray-600">Paper Topic</span>
+                          <XCircle className="h-4 w-4 text-red-600" />
+                        </div>
+                        {/* Paper Topic row */}
+                        <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
+                          <span className="text-sm text-gray-600">Assignment Type</span>
+                          <BadgeCheck className="h-4 w-4 text-green-600" />
+                        </div>
+                        {/* Deadline row */}
+                        <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
+                          <span className="text-sm text-gray-600">Deadline</span>
+                          <BadgeCheck className="h-4 w-4 text-green-600" />
+                        </div>
+
+                        {/* Paper Topic row */}
+                        <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
+                          <span className="text-sm text-gray-600">Reference Style</span>
+                          <XCircle className="h-4 w-4 text-red-600" />
+                        </div>
+                        {/* Paper Topic row */}
+                        <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
+                          <span className="text-sm text-gray-600">Word Count</span>
+                          <XCircle className="h-4 w-4 text-red-600" />
+                        </div>
+                        {/* Paper Topic row */}
+                        <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
+                          <span className="text-sm text-gray-600">Additional Instructions</span>
+                          <BadgeCheck className="h-4 w-4 text-green-600" />
+                        </div>
+
+                        <div className="">
+                          
+                        </div>
+                      </div>
+                    </CardContent>
+                    <CardFooter className="px-6 -mt-5">
+                    </CardFooter>
+                  </Card>
+                )}
+                {moduleMaterial && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg flex items-center">
+                        <FileTextIcon className="h-5 w-5 mr-2 text-emerald-600" />
                         Provided Materials
                       </CardTitle>
                       <CardDescription>Provided reference, papers topic, paper type deadline</CardDescription>
@@ -813,6 +916,10 @@ const AIAssignmentWriter = () => {
                         <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
                           <span className="text-sm text-gray-600">Additional Instructions</span>
                           <BadgeCheck className="h-4 w-4 text-green-600" />
+                        </div>
+
+                        <div className="">
+                          
                         </div>
                       </div>
                     </CardContent>
@@ -1279,11 +1386,16 @@ const AIAssignmentWriter = () => {
                   <ScrollArea className="h-[500px] pr-4">
                     <div className="p-6 prose max-w-none">
                       <h2 className="text-2xl font-bold text-center mb-4">{assignment.title}</h2>
-
                       {assignment.sections &&
                         assignment.sections.map((section) => (
                           <div key={section.id} className="mb-8">
-                            <h4 className="text-lg font-semibold text-slate-800 mb-3">{section.title}</h4>
+                            <div className="flex justify-between items-center">
+                              <h4 className="text-lg font-semibold text-slate-800 mb-3">{section.title}</h4>
+                              <Button variant="outline" className="cursor-pointer" onClick={() => {
+                                setIsShowSection(!isShowSection);
+                                setSectionData(section);
+                              }}>Edit</Button>
+                            </div>
                             {section.content.split("\n\n").map((paragraph, idx) => (
                               <p key={idx} className="text-slate-700 mb-4">
                                 {paragraph}
@@ -1305,9 +1417,9 @@ const AIAssignmentWriter = () => {
                   }}>
                     Back to Generate
                   </Button>
-                  <Button variant="outline" className="cursor-pointer" onClick={regenerateAssignment}>
+                  {/* <Button variant="outline" className="cursor-pointer" onClick={regenerateAssignment}>
                     Regenerate Assignment
-                  </Button>
+                  </Button> */}
                 </div>
               </div>
             ) : (
@@ -1426,6 +1538,11 @@ const AIAssignmentWriter = () => {
             </CardContent>
           </Card>
         </div>
+      )}
+
+
+      {isShowSection && (
+        <SectionViewer section={sectionData} onClose={() => setIsShowSection(!isShowSection)} />
       )}
     </div>
   )

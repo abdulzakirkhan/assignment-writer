@@ -281,6 +281,7 @@ export const copyToClipboard = async (assignment: AssignmentDetails): Promise<bo
     await navigator.clipboard.writeText(content)
     return true
   } catch (error) {
+    console.log("assignment :",assignment)
     console.error("Failed to copy to clipboard:", error)
     return false
   }
