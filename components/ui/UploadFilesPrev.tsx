@@ -23,10 +23,10 @@ export default function UploadFilesPrev({uploadedFiles,removeFile,indexNo} : Upl
     <>
       {uploadedFiles.map((file:any, index:any) => {
             if (file.category === indexNo) {
-            return <div key={index}>
+            return <div key={index} className='w-full'>
                 <div
                     key={file.id || index}
-                    className="flex items-center border px-2 border-slate-400 py-2 justify-between bg-slate-50 rounded-lg w-full"
+                    className="flex items-center border px-2 border-slate-400 py-2 justify-between bg-slate-50 rounded-lg !w-full"
                 >
                     <div className="flex items-center space-x-3">
                     <div

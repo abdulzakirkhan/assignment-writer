@@ -14,9 +14,6 @@ export default function Home() {
     if (!user) {
       router.push("/auth/sign-in");
     }
-
-    console.log("user :",user)
-
   }, [])
   
   return (
