@@ -531,6 +531,7 @@ const AIAssignmentWriter = () => {
 
 
   const [filteredFile, setFilteredFile] = useState<FileInfo | null>(null);
+  const [moduleFile, setModuleFile] = useState<FileInfo | null>(null);
   const filesLength = uploadedFiles.length;
 
   useEffect(() => {
@@ -541,8 +542,12 @@ const AIAssignmentWriter = () => {
     }
     if(uploadedFiles.length > 0){
       const file = uploadedFiles.find(file => file.category === "assignment-brief")
+      const ModuleFile = uploadedFiles.find(file => file.category === "module-material")
       if(file){
         setFilteredFile(file)
+      }
+      if(ModuleFile){
+        setModuleFile(ModuleFile)
       }
     }
   }, [uploadedFiles])
@@ -729,6 +734,8 @@ const AIAssignmentWriter = () => {
   };
 
 
+  console.log("uploadedFiles",uploadedFiles)
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-blue-50">
       {/* Header */}
@@ -824,7 +831,6 @@ const AIAssignmentWriter = () => {
                   </CardContent>
                   <CardFooter className="px-6 py-6 -mt-5 w-full">                    
                     <div className="flex w-full flex-col gap-3 max-h-[160px] overflow-y-auto">
-
                     <UploadFilesPrev
                       uploadedFiles={uploadedFiles.map(file => ({
                         ...file,
@@ -957,7 +963,7 @@ const AIAssignmentWriter = () => {
 
             </div>
             <div className="flex items-center justify-center py-8">
-              {uploadedFiles.length === 2 && (
+              {filteredFile && moduleFile &&  (
 
                 <Button
                   className="bg-gradient-to-r cursor-pointer from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
