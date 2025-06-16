@@ -63,7 +63,7 @@ export default function SignIn() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="w-full px-4 py-3 bg-gray-800 bg-opacity-50 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-white placeholder-gray-500 transition-all"
-                    placeholder="Name"
+                    placeholder="Name *"
                     required
                   />
                 <div className="absolute right-3 top-3 text-gray-500">
@@ -83,7 +83,7 @@ export default function SignIn() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full px-4 py-3 bg-gray-800 bg-opacity-50 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-white placeholder-gray-500 transition-all"
-                    placeholder="Email Address"
+                    placeholder="Email Address *"
                     required
                   />
                   <div className="absolute right-3 top-3 text-gray-500">
@@ -99,7 +99,7 @@ export default function SignIn() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full px-4 py-3 bg-gray-800 bg-opacity-50 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-white placeholder-gray-500 transition-all"
-                    placeholder="Password"
+                    placeholder="Password *"
                     required
                   />
                   <div className="absolute right-3 top-3 text-gray-500">
@@ -112,7 +112,7 @@ export default function SignIn() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="w-full px-4 py-3 bg-gray-800 bg-opacity-50 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-white placeholder-gray-500 transition-all"
-                    placeholder="Confirm Password"
+                    placeholder="Confirm Password *"
                     required
                   />
                   <div className="absolute right-3 top-3 text-gray-500">

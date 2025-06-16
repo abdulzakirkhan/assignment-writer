@@ -60,6 +60,7 @@ import type {
 import { REFERENCE_STYLES } from "@/types/assignment"
 import { downloadAsText, downloadAsHTML, downloadAsDocx, copyToClipboard } from "@/lib/document-utils"
 import UploadFilesPrev from "./ui/UploadFilesPrev";
+import { Table, TableBody, TableHeader, TableRow } from "./ui/table";
 
 const AIAssignmentWriter = () => {
   const { toast } = useToast()
@@ -529,8 +530,7 @@ const AIAssignmentWriter = () => {
 
 
 
-  const filteredFile = uploadedFiles.find(file => file.category === "assignment-brief");
-  const moduleMaterial = uploadedFiles.find(file => file.category === "module-material");
+  const [filteredFile, setFilteredFile] = useState<FileInfo | null>(null);
   const filesLength = uploadedFiles.length;
 
   useEffect(() => {
@@ -539,9 +539,14 @@ const AIAssignmentWriter = () => {
       setAssignments(null)
       setAssignmentGenerated(false)
     }
-
-  }, [filteredFile,uploadedFiles])
-
+    if(uploadedFiles.length > 0){
+      const file = uploadedFiles.find(file => file.category === "assignment-brief")
+      if(file){
+        setFilteredFile(file)
+      }
+    }
+  }, [uploadedFiles])
+  
   const [assignmentId, setAssignmentId] = useState(123456891011121314); // Example assignment ID, can be generated dynamically
   const [assignmentType, setAssignmentType] = useState("Essay"); // Default assignment type
   const [assignmentTopic, setAssignmentTopic] = useState("secondary education"); // Default topic
@@ -718,6 +723,12 @@ const AIAssignmentWriter = () => {
       wordCount: 2289
     },
   ]
+  const formatDateForInput = (timestamp: number) => {
+    const date = new Date(timestamp);
+    return date.toISOString().split('T')[0]; // returns YYYY-MM-DD
+  };
+
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-blue-50">
       {/* Header */}
@@ -738,11 +749,8 @@ const AIAssignmentWriter = () => {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <Sparkles className="h-4 w-4 text-amber-500" />
-                <span className="text-xs font-medium text-slate-700">Powered by Google Gemini</span>
+                <span className="text-xs font-medium text-slate-700">Powered by AI Team</span>
               </div>
-              <Button variant="ghost" size="sm" className="text-xs" onClick={toggleDebugMode}>
-                {debugMode ? "Disable Debug" : "Enable Debug"}
-              </Button>
             </div>
           </div>
         </div>
@@ -764,7 +772,7 @@ const AIAssignmentWriter = () => {
               <FileText className="h-4 w-4" />
               <span>Assingment</span>
             </TabsTrigger>
-            <TabsTrigger value="preview" className="flex items-center space-x-2">
+            <TabsTrigger value="preview" disabled={assignmentPreview ? false : true} className="flex items-center space-x-2">
               <Eye className="h-4 w-4" />
               <span>Preview</span>
             </TabsTrigger>
@@ -777,7 +785,7 @@ const AIAssignmentWriter = () => {
           {/* Upload Tab Content */}
           <TabsContent value="upload">
             <>
-            <div className={`grid ${filesLength === 0 ? "md:grid-cols-2" : filesLength === 1 ? "md:grid-cols-3" : filesLength >= 2 ? "md:grid-cols-4" : "md:grid-cols-2"} gap-8`}>
+            <div className={`grid ${filesLength === 0 ? "md:grid-cols-2" : filesLength === 1 ? "md:grid-cols-3" : filesLength >= 2 ? "md:grid-cols-3" : "md:grid-cols-2"} gap-8`}>
                 {/* Assignment Brief Upload */}
                 <Card>
                   <CardHeader className="pb-3">
@@ -814,7 +822,9 @@ const AIAssignmentWriter = () => {
                       </div>
                     </div>
                   </CardContent>
-                  <CardFooter className="px-6 -mt-5 w-full">                    
+                  <CardFooter className="px-6 py-6 -mt-5 w-full">                    
+                    <div className="flex flex-col gap-3 h-[160px] overflow-y-auto">
+
                     <UploadFilesPrev
                       uploadedFiles={uploadedFiles.map(file => ({
                         ...file,
@@ -830,6 +840,7 @@ const AIAssignmentWriter = () => {
                       removeFile={removeFile}
                       indexNo={"assignment-brief"}
                     />
+                    </div>
                   </CardFooter>
                 </Card>
 
@@ -846,7 +857,7 @@ const AIAssignmentWriter = () => {
                     <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 hover:border-emerald-500 transition-colors">
                       <input
                         type="file"
-                        multiple
+                        multiple required
                         onChange={(e) => handleFileUpload(e, "module-material")}
                         className="hidden"
                         id="module-material-upload"
@@ -866,78 +877,28 @@ const AIAssignmentWriter = () => {
                       </div>
                     </div>
                   </CardContent>
-                  <CardFooter className="px-6 -mt-5">                    
-                    <UploadFilesPrev
-                      uploadedFiles={uploadedFiles.map(file => ({
-                        ...file,
-                        type:
-                          file.type === "PDF"
-                            ? "PDF"
-                            : file.type === "DOC"
-                            ? "DOC"
-                            : file.type === "DOCS"
-                            ? "DOCS"
-                            : "OTHER",
-                      }))}
-                      removeFile={removeFile}
-                      indexNo={"module-material"}
-                    />
+                  <CardFooter className="px-6 py-6 -mt-5 w-full">       
+                    <div className="flex flex-col gap-3 h-[160px] overflow-y-auto">
+                      <UploadFilesPrev
+                        uploadedFiles={uploadedFiles.map(file => ({
+                          ...file,
+                          type:
+                            file.type === "PDF"
+                              ? "PDF"
+                              : file.type === "DOC"
+                              ? "DOC"
+                              : file.type === "DOCS"
+                              ? "DOCS"
+                              : "OTHER",
+                        }))}
+                        removeFile={removeFile}
+                        indexNo={"module-material"}
+                      />
+                    </div>             
                   </CardFooter>
                 </Card>
 
-                {/* Reading List Upload
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center">
-                      <BookOpen className="h-5 w-5 mr-2 text-amber-600" />
-                      Reading List
-                    </CardTitle>
-                    <CardDescription>Upload reference papers, articles, and books</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 hover:border-amber-500 transition-colors">
-                      <input
-                        type="file"
-                        multiple
-                        onChange={(e) => handleFileUpload(e, "reading-list")}
-                        className="hidden"
-                        id="reading-list-upload"
-                        ref={readingListInputRef}
-                        accept=".pdf,.doc,.docx,.txt"
-                      />
-                      <div className="text-center cursor-pointer" onClick={() => triggerFileInput(readingListInputRef)}>
-                        <Files className="mx-auto h-8 w-8 text-amber-500 mb-2" />
-                        <p className="text-sm font-medium text-slate-700">Upload Reading List</p>
-                        <p className="text-xs text-slate-500 mt-1">PDF, DOC, DOCX, TXT</p>
-
-                        {getFilesCountByCategory("reading-list") > 0 && (
-                          <Badge variant="secondary" className="mt-2">
-                            {getFilesCountByCategory("reading-list")} file(s) uploaded
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="px-6 -mt-5">                    
-                    <UploadFilesPrev
-                      uploadedFiles={uploadedFiles.map(file => ({
-                        ...file,
-                        type:
-                          file.type === "PDF"
-                            ? "PDF"
-                            : file.type === "DOC"
-                            ? "DOC"
-                            : file.type === "DOCS"
-                            ? "DOCS"
-                            : "OTHER",
-                      }))}
-                      removeFile={removeFile}
-                      indexNo={"reading-list"}
-                    />
-                  </CardFooter>
-                </Card> */}
-
-
+               
                 {/* Provided Materials */}
 
                 {filteredFile && (
@@ -992,119 +953,15 @@ const AIAssignmentWriter = () => {
                     </CardFooter>
                   </Card>
                 )}
-                {moduleMaterial && (
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-lg flex items-center">
-                        <FileTextIcon className="h-5 w-5 mr-2 text-emerald-600" />
-                        Provided Materials
-                      </CardTitle>
-                      <CardDescription>Provided reference, papers topic, paper type deadline</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 space-y-3">
-                        {/* Paper Topic row */}
-                        <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
-                          <span className="text-sm text-gray-600">Paper Topic</span>
-                          <XCircle className="h-4 w-4 text-red-600" />
-                        </div>
-                        {/* Paper Topic row */}
-                        <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
-                          <span className="text-sm text-gray-600">Assignment Type</span>
-                          <BadgeCheck className="h-4 w-4 text-green-600" />
-                        </div>
-                        {/* Deadline row */}
-                        <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
-                          <span className="text-sm text-gray-600">Deadline</span>
-                          <BadgeCheck className="h-4 w-4 text-green-600" />
-                        </div>
-
-                        {/* Paper Topic row */}
-                        <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
-                          <span className="text-sm text-gray-600">Reference Style</span>
-                          <XCircle className="h-4 w-4 text-red-600" />
-                        </div>
-                        {/* Paper Topic row */}
-                        <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
-                          <span className="text-sm text-gray-600">Word Count</span>
-                          <XCircle className="h-4 w-4 text-red-600" />
-                        </div>
-                        {/* Paper Topic row */}
-                        <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
-                          <span className="text-sm text-gray-600">Additional Instructions</span>
-                          <BadgeCheck className="h-4 w-4 text-green-600" />
-                        </div>
-
-                        <div className="">
-                          
-                        </div>
-                      </div>
-                    </CardContent>
-                    <CardFooter className="px-6 -mt-5">
-                    </CardFooter>
-                  </Card>
-                )}
-
-                {/* Other Files Upload */}
-                {/* <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center">
-                      <Files className="h-5 w-5 mr-2 text-blue-600" />
-                      Other Files
-                    </CardTitle>
-                    <CardDescription>Upload any additional supporting documents</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 hover:border-blue-500 transition-colors">
-                      <input
-                        type="file"
-                        multiple
-                        onChange={(e) => handleFileUpload(e, "other")}
-                        className="hidden"
-                        id="other-upload"
-                        ref={otherInputRef}
-                        accept=".pdf,.doc,.docx,.txt"
-                      />
-                      <div className="text-center cursor-pointer" onClick={() => triggerFileInput(otherInputRef)}>
-                        <Upload className="mx-auto h-8 w-8 text-blue-500 mb-2" />
-                        <p className="text-sm font-medium text-slate-700">Upload Other Files</p>
-                        <p className="text-xs text-slate-500 mt-1">PDF, DOC, DOCX, TXT</p>
-
-                        {getFilesCountByCategory("other") > 0 && (
-                          <Badge variant="secondary" className="mt-2">
-                            {getFilesCountByCategory("other")} file(s) uploaded
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="px-6 -mt-5">                    
-                    <UploadFilesPrev
-                      uploadedFiles={uploadedFiles.map(file => ({
-                        ...file,
-                        type:
-                          file.type === "PDF"
-                            ? "PDF"
-                            : file.type === "DOC"
-                            ? "DOC"
-                            : file.type === "DOCS"
-                            ? "DOCS"
-                            : "OTHER",
-                      }))}
-                      removeFile={removeFile}
-                      indexNo={"other"}
-                    />
-                  </CardFooter>
-                </Card> */}
+               
 
             </div>
             <div className="flex items-center justify-center py-8">
-              {filteredFile && (
+              {uploadedFiles.length === 2 && (
 
                 <Button
                   className="bg-gradient-to-r cursor-pointer from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
                   onClick={() => setActiveTab("generate")}
-                  disabled={uploadedFiles.length === 0 && !debugMode}
                 >
                   Continue to Generate
                   <ChevronRight className="ml-2 h-4 w-4" />
@@ -1171,60 +1028,6 @@ const AIAssignmentWriter = () => {
                         Generation Settings
                       </h4>
 
-                      {/* <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div className="space-y-2">
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id="academic"
-                              checked={generationSettings.academicStyle}
-                              onCheckedChange={(checked) =>
-                                setGenerationSettings({ ...generationSettings, academicStyle: !!checked })
-                              }
-                            />
-                            <label htmlFor="academic" className="text-xs text-slate-700">
-                              Academic style
-                            </label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id="citations"
-                              checked={generationSettings.includeCitations}
-                              onCheckedChange={(checked) =>
-                                setGenerationSettings({ ...generationSettings, includeCitations: !!checked })
-                              }
-                            />
-                            <label htmlFor="citations" className="text-xs text-slate-700">
-                              Include citations
-                            </label>
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id="examples"
-                              checked={generationSettings.includeExamples}
-                              onCheckedChange={(checked) =>
-                                setGenerationSettings({ ...generationSettings, includeExamples: !!checked })
-                              }
-                            />
-                            <label htmlFor="examples" className="text-xs text-slate-700">
-                              Include examples
-                            </label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id="conclusion"
-                              checked={generationSettings.addConclusion}
-                              onCheckedChange={(checked) =>
-                                setGenerationSettings({ ...generationSettings, addConclusion: !!checked })
-                              }
-                            />
-                            <label htmlFor="conclusion" className="text-xs text-slate-700">
-                              Add conclusion
-                            </label>
-                          </div>
-                        </div>
-                      </div> */}
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         {/* assignment id */}
                         <div className="w-full">
@@ -1266,8 +1069,8 @@ const AIAssignmentWriter = () => {
                                 if (input) input.showPicker();
                               }, 0);
                             }}
-                            value={deadline}
-                            onChange={(e) => setDeadline(e.target.value ? new Date(e.target.value).getTime() : Date.now())}
+                            value={formatDateForInput(deadline)}
+                            onChange={(e) => setDeadline(new Date(e.target.value).getTime())}
                             className="h-8 text-xs"
                             type="date"
                           />
@@ -1275,8 +1078,8 @@ const AIAssignmentWriter = () => {
                       </div>  
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
-                          <label className="text-xs font-medium text-slate-700">Word Count</label>
-                          <div className="flex items-center space-x-2">
+                          <label className="text-xs font-medium text-slate-700">Word Count <span className="text-xl text-red-500 inline-flex align-middle">*</span> </label>
+                          <div className="flex flex-col space-x-2">
                             <Input
                               value={generationSettings.wordCount}
                               onChange={(e) =>
@@ -1291,6 +1094,9 @@ const AIAssignmentWriter = () => {
                               max={10000}
                             />
                             {/* <span className="text-xs text-slate-500">words</span> */}
+                            {generationSettings.wordCount < 500 && (
+                              <p className="text-red-500 text-xs mt-3">Word count must be at least 500</p>
+                            )}
                           </div>
                         </div>
 
@@ -1399,9 +1205,7 @@ const AIAssignmentWriter = () => {
                       {uploadedFiles.length === 0 && !useMockData && !debugMode && (
                         <p className="text-red-500 text-xs mt-3">Please upload files first</p>
                       )}
-                      {generationSettings.wordCount < 500 && (
-                        <p className="text-red-500 text-xs mt-3">Word count must be at least 500</p>
-                      )}
+                      
                     </div>
                   </div>
                 )}
@@ -1470,18 +1274,18 @@ const AIAssignmentWriter = () => {
           {/* assignment Tab Content */}
           <TabsContent value="assignment">
             {assignmentsData ? (
-              <table className="table-auto w-full border border-gray-300 rounded-lg">
-                    <thead className="bg-gray-100 border border-gray-300">
-                      <tr>
+              <Table className="">
+                    <TableHeader className="">
+                      <TableRow>
                         <th className="px-6 py-3 border border-gray-300 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">S.No</th>
                         <th className="px-6 py-3 border border-gray-300 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
                         <th className="px-6 py-3 border border-gray-300  text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                      </tr>
-                    </thead>
-                     <tbody className="">
+                      </TableRow>
+                    </TableHeader>
+                     <TableBody>
                 {
                   assignmentsData.map((assignment,index) => (
-                    <tr key={assignment.id}>
+                    <TableRow key={assignment.id}>
                       <td className="px-6 border border-gray-300 py-4 whitespace-nowrap text-sm text-gray-700">{index + 1}</td>
                       <td className="px-6 border border-gray-300 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{assignment.title}</td>
                       <td className="px-6 border border-gray-300 py-4 whitespace-nowrap text-sm text-right space-x-2">
@@ -1497,11 +1301,11 @@ const AIAssignmentWriter = () => {
                           Preview
                         </Button>
                       </td>
-                    </tr>
+                    </TableRow>
                   ))
                 }
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             ) : (
               <div className="text-center py-24">
                 <FileText className="mx-auto h-12 w-12 text-slate-300 mb-3" />
@@ -1570,11 +1374,13 @@ const AIAssignmentWriter = () => {
 
                 <div className="flex justify-between items-center">
                   <Button variant="outline" onClick={() => {
+                    setFilteredFile(null)
                     setAssignmentPreview(false)
                     setAssignmentPreviewData(null)
-                    setActiveTab("assignment")
+                    setApiResponse(null)
+                    setActiveTab("upload")
                   }}>
-                    Back to Assignemts
+                    Generate New Assignemts
                   </Button>
                 </div>
               </div>
@@ -1639,62 +1445,6 @@ const AIAssignmentWriter = () => {
           </TabsContent>
         </Tabs>
       </div>
-
-      {/* Debug Panel */}
-      {debugMode && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Debug Panel</CardTitle>
-              <CardDescription>Information for debugging and testing purposes.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Label htmlFor="debug-mode">Debug Mode</Label>
-                <Checkbox checked={debugMode} onCheckedChange={toggleDebugMode} id="debug-mode" />
-              </div>
-              <div className="flex items-center space-x-2">
-                <Label htmlFor="use-test-data">Use Test Data</Label>
-                <Checkbox
-                  checked={useMockData}
-                  onCheckedChange={(checked) => setUseMockData(!!checked)}
-                  id="use-test-data"
-                />
-              </div>
-              <div className="flex items-center space-x-2">
-                <Button variant="outline" size="sm" onClick={useMockDataFallback}>
-                  Generate with Sample Data
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setApiError(null)
-                    setRetryCount((prev) => prev + 1)
-                    generateAssignment()
-                  }}
-                >
-                  Retry API Call
-                </Button>
-              </div>
-              <div>
-                <p>API Error:</p>
-                <pre className="bg-slate-100 p-2 rounded text-xs">{apiError || "None"}</pre>
-              </div>
-              <div>
-                <p>Uploaded Files:</p>
-                <pre className="bg-slate-100 p-2 rounded text-xs">
-                  {JSON.stringify(uploadedFiles.length, null, 2)} files
-                </pre>
-              </div>
-              <div>
-                <p>Generation Settings:</p>
-                <pre className="bg-slate-100 p-2 rounded text-xs">{JSON.stringify(generationSettings, null, 2)}</pre>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
 
 
       {isShowSection && (

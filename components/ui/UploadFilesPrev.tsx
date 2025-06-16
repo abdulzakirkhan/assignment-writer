@@ -1,7 +1,7 @@
 "use client"
 import {BookOpen, FileText, FileType, Trash2 } from 'lucide-react'
 import { Badge } from "@/components/ui/badge"
-import React from 'react'
+import React, { useId } from 'react'
 import { Button } from './button'
 import { cn } from '@/lib/utils'
 type UploadedFile = {
@@ -19,11 +19,11 @@ type UploadFilesPrevProps = {
 };
 
 export default function UploadFilesPrev({uploadedFiles,removeFile,indexNo} : UploadFilesPrevProps) {
-  return (
-    <>
+    return (
+        <>
       {uploadedFiles.map((file:any, index:any) => {
-            if (file.category === indexNo) {
-            return <div key={index} className='w-full'>
+          if (file.category === indexNo) {
+            return <div key={file.id} className='w-full'>
                 <div
                     key={file.id || index}
                     className="flex items-center border px-2 border-slate-400 py-2 justify-between bg-slate-50 rounded-lg !w-full"
