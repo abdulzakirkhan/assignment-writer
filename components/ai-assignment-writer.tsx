@@ -75,7 +75,7 @@ const AIAssignmentWriter = () => {
   const [assignmentGenerated, setAssignmentGenerated] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [generationProgress, setGenerationProgress] = useState(0)
-  const [assignment, setAssignment] = useState<AssignmentDetails | null>(null)
+  const [assignments, setAssignments] = useState<AssignmentDetails | null>(null)
   const [selectedSection, setSelectedSection] = useState<string | null>(null)
   const [generationSettings, setGenerationSettings] = useState<GenerationSettings>({
     academicStyle: true,
@@ -105,7 +105,7 @@ const AIAssignmentWriter = () => {
   const { messages, append, isLoading } = useChat({
     api: "/api/chat",
     body: {
-      assignment,
+      assignments,
     },
     onResponse: () => {
       setIsProcessingChat(false)
@@ -236,7 +236,7 @@ const AIAssignmentWriter = () => {
         setGenerationProgress(100)
 
         // Update state
-        setAssignment(mockAssignment)
+        setAssignments(mockAssignment)
         setAssignmentGenerated(true)
 
         // Switch to preview tab
@@ -303,7 +303,7 @@ const AIAssignmentWriter = () => {
       }
 
       // Update state
-      setAssignment(assignmentData)
+      setAssignments(assignmentData)
       setAssignmentGenerated(true)
 
       // Switch to preview tab
@@ -407,7 +407,7 @@ const AIAssignmentWriter = () => {
   const [copied, setCopied] = useState(false);
   // Download assignment with multiple format options
   const handleDownload = async (format: "txt" | "html" | "docx" | "copy" = "docx") => {
-    if (!assignment) return
+    if (!assignments) return
 
     setIsDownloading(true)
 
@@ -422,16 +422,16 @@ const AIAssignmentWriter = () => {
 
       switch (format) {
         case "txt":
-          downloadAsText(assignment)
+          downloadAsText(assignments)
           break
         case "html":
-          downloadAsHTML(assignment)
+          downloadAsHTML(assignments)
           break
         case "docx":
-          await downloadAsDocx(assignment)
+          await downloadAsDocx(assignments)
           break
         case "copy":
-          const success = await copyToClipboard(assignment)
+          const success = await copyToClipboard(assignments)
           if (success) {
             toast({
               title: "Copied to Clipboard",
@@ -470,7 +470,7 @@ const AIAssignmentWriter = () => {
 
   // Regenerate assignment
   const regenerateAssignment = async () => {
-    if (!assignment) return
+    if (!assignments) return
 
     toast({
       title: "Regenerating",
@@ -536,7 +536,7 @@ const AIAssignmentWriter = () => {
   useEffect(() => {
     if(!filteredFile){
       setApiResponse(null)
-      setAssignment(null)
+      setAssignments(null)
       setAssignmentGenerated(false)
     }
 
@@ -604,7 +604,120 @@ const AIAssignmentWriter = () => {
     );
   };
 
-  console.log("filesLength :",filesLength)
+  const [assignmentPreview, setAssignmentPreview] = useState(false)
+  const [assignmentPreviewData, setAssignmentPreviewData] = useState<AssignmentDetails | null>(null)
+
+
+  const assignmentsData =[
+    {
+      createdAt:"Mon Jun 16 2025 10:48:07 GMT+0500 (Pakistan Standard Time)",
+      format:"DOCX",
+      id:"3e709380-a5c5-4ab7-b850-8031f6f70e",
+      pageCount: 8,
+      referenceStyle: "Harvard",
+      references:"df",
+      sections:[
+        {
+          content: "Agent-based modelling (ABM) has emerged as a powerful computational tool for simulating complex systems composed of interacting autonomous agents.  Unlike traditional mode",
+          id:"b79b9b37-76bf-4fc2-a38c-2ed6a10946f9",
+          title: "Introduction: Agent-Based Modelling and its Applications",
+          wordCount: 363
+        },
+        {
+          content: "Agent-based modelling (ABM) has emerged as a powerful computational tool for simulating complex systems composed of interacting autonomous agents.  Unlike traditional mode",
+          id:"b79b9b37-76bf-4fc2-a38c-2ed6a10946f9",
+          title: "Introduction: Agent-Based Modelling and its Applications",
+          wordCount: 363
+        },
+        {
+          content: "Agent-based modelling (ABM) has emerged as a powerful computational tool for simulating complex systems composed of interacting autonomous agents.  Unlike traditional mode",
+          id:"b79b9b37-76bf-4fc2-a38c-2ed6a10946f9",
+          title: "Introduction: Agent-Based Modelling and its Applications",
+          wordCount: 363
+        },
+        {
+          content: "Agent-based modelling (ABM) has emerged as a powerful computational tool for simulating complex systems composed of interacting autonomous agents.  Unlike traditional mode",
+          id:"b79b9b37-76bf-4fc2-a38c-2ed6a10946f9",
+          title: "Introduction: Agent-Based Modelling and its Applications",
+          wordCount: 363
+        },
+      ],
+      title:"A Critical Analysis of Agent-Based Modelling in the Context of the AgentApp System",
+      wordCount: 2289
+    },
+    {
+      createdAt:"Mon Jun 16 2025 10:48:07 GMT+0500 (Pakistan Standard Time)",
+      format:"DOCX",
+      id:"3e709380-a5c5-4ab7-8031f6f70e7d",
+      pageCount: 8,
+      referenceStyle: "Harvard",
+      references:"df",
+      sections:[
+        {
+          content: "Agent-based modelling (ABM) has emerged as a powerful computational tool for simulating complex systems composed of interacting autonomous agents.  Unlike traditional mode",
+          id:"b79b9b37-76bf-4fc2-a38c-2ed6a10946f9",
+          title: "Introduction: Agent-Based Modelling and its Applications",
+          wordCount: 363
+        },
+        {
+          content: "Agent-based modelling (ABM) has emerged as a powerful computational tool for simulating complex systems composed of interacting autonomous agents.  Unlike traditional mode",
+          id:"b79b9b37-76bf-4fc2-a38c-2ed6a10946f9",
+          title: "Introduction: Agent-Based Modelling and its Applications",
+          wordCount: 363
+        },
+        {
+          content: "Agent-based modelling (ABM) has emerged as a powerful computational tool for simulating complex systems composed of interacting autonomous agents.  Unlike traditional mode",
+          id:"b79b9b37-76bf-4fc2-a38c-2ed6a10946f9",
+          title: "Introduction: Agent-Based Modelling and its Applications",
+          wordCount: 363
+        },
+        {
+          content: "Agent-based modelling (ABM) has emerged as a powerful computational tool for simulating complex systems composed of interacting autonomous agents.  Unlike traditional mode",
+          id:"b79b9b37-76bf-4fc2-a38c-2ed6a10946f9",
+          title: "Introduction: Agent-Based Modelling and its Applications",
+          wordCount: 363
+        },
+      ],
+      title:"A Critical Analysis of Agent-Based Modelling in the Context of the AgentApp System",
+      wordCount: 2289
+    },
+    {
+      createdAt:"Mon Jun 16 2025 10:48:07 GMT+0500 (Pakistan Standard Time)",
+      format:"DOCX",
+      id:"3e4ab7-b850-8031f6f70e7d",
+      pageCount: 8,
+      referenceStyle: "Harvard",
+      references:"df",
+      sections:[
+        {
+          content: "Agent-based modelling (ABM) has emerged as a powerful computational tool for simulating complex systems composed of interacting autonomous agents.  Unlike traditional mode",
+          id:"b79b9b37-76bf-4fc2-a38c-2ed6a10946f9",
+          title: "Introduction: Agent-Based Modelling and its Applications",
+          wordCount: 363
+        },
+        {
+          content: "Agent-based modelling (ABM) has emerged as a powerful computational tool for simulating complex systems composed of interacting autonomous agents.  Unlike traditional mode",
+          id:"b79b9b37-76bf-4fc2-a38c-2ed6a10946f9",
+          title: "Introduction: Agent-Based Modelling and its Applications",
+          wordCount: 363
+        },
+        {
+          content: "Agent-based modelling (ABM) has emerged as a powerful computational tool for simulating complex systems composed of interacting autonomous agents.  Unlike traditional mode",
+          id:"b79b9b37-76bf-4fc2-a38c-2ed6a10946f9",
+          title: "Introduction: Agent-Based Modelling and its Applications",
+          wordCount: 363
+        },
+        {
+          content: "Agent-based modelling (ABM) has emerged as a powerful computational tool for simulating complex systems composed of interacting autonomous agents.  Unlike traditional mode",
+          id:"b79b9b37-76bf-4fc2-a38c-2ed6a10946f9",
+          title: "Introduction: Agent-Based Modelling and its Applications",
+          wordCount: 363
+        },
+      ],
+      title:"A Critical Analysis of Agent-Based Modelling in the Context of the AgentApp System",
+      wordCount: 2289
+    },
+  ]
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-blue-50">
       {/* Header */}
@@ -638,7 +751,7 @@ const AIAssignmentWriter = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         {/* Main Tabs */}
         <Tabs defaultValue="upload" value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-4 w-full max-w-3xl mx-auto mb-8">
+          <TabsList className="grid grid-cols-5 w-full max-w-3xl mx-auto mb-8">
             <TabsTrigger value="upload" className="flex items-center space-x-2">
               <Upload className="h-4 w-4" />
               <span>Upload</span>
@@ -647,7 +760,11 @@ const AIAssignmentWriter = () => {
               <FileText className="h-4 w-4" />
               <span>Generate</span>
             </TabsTrigger>
-            <TabsTrigger value="preview" disabled={apiResponse?.ok ? false : true} className="flex items-center space-x-2">
+            <TabsTrigger value="assignment" className="flex items-center space-x-2">
+              <FileText className="h-4 w-4" />
+              <span>Assingment</span>
+            </TabsTrigger>
+            <TabsTrigger value="preview" className="flex items-center space-x-2">
               <Eye className="h-4 w-4" />
               <span>Preview</span>
             </TabsTrigger>
@@ -1226,7 +1343,7 @@ const AIAssignmentWriter = () => {
                               onChange={(e) =>
                                 setGenerationSettings({
                                   ...generationSettings,
-                                  copies: Number.parseInt(e.target.value) || 1,
+                                  copies: Number.parseInt(e.target.value),
                                 })
                               }
                               className="h-8 text-xs"
@@ -1324,7 +1441,7 @@ const AIAssignmentWriter = () => {
                   </div>
                 )}
 
-                {assignmentGenerated && assignment && (
+                {assignmentGenerated && assignments && (
                   <div className="space-y-6">
                     <div className="text-center">
                       <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-3" />
@@ -1350,9 +1467,53 @@ const AIAssignmentWriter = () => {
             </Card>
           </TabsContent>
 
+          {/* assignment Tab Content */}
+          <TabsContent value="assignment">
+            {assignmentsData ? (
+              <table className="table-auto w-full border border-gray-300 rounded-lg">
+                    <thead className="bg-gray-100 border border-gray-300">
+                      <tr>
+                        <th className="px-6 py-3 border border-gray-300 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">S.No</th>
+                        <th className="px-6 py-3 border border-gray-300 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                        <th className="px-6 py-3 border border-gray-300  text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                     <tbody className="">
+                {
+                  assignmentsData.map((assignment,index) => (
+                    <tr key={assignment.id}>
+                      <td className="px-6 border border-gray-300 py-4 whitespace-nowrap text-sm text-gray-700">{index + 1}</td>
+                      <td className="px-6 border border-gray-300 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{assignment.title}</td>
+                      <td className="px-6 border border-gray-300 py-4 whitespace-nowrap text-sm text-right space-x-2">
+                        <Button
+                          variant="outline"
+                          className="cursor-pointer"
+                          onClick={() => {
+                            setAssignmentPreview(true);
+                            setAssignmentPreviewData(assignment);
+                            setActiveTab("preview");
+                          }}
+                        >
+                          Preview
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                }
+                </tbody>
+              </table>
+            ) : (
+              <div className="text-center py-24">
+                <FileText className="mx-auto h-12 w-12 text-slate-300 mb-3" />
+                <p className="text-slate-500 text-sm">No assignment generated yet</p>
+                <p className="text-slate-400 text-xs mt-1">Generate an assignment to preview it here</p>
+              </div>
+            )}
+          </TabsContent>
+
           {/* Preview Tab Content */}
           <TabsContent value="preview">
-            {assignment ? (
+            {assignmentPreview && assignmentPreviewData ? (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-bold text-slate-800">Assignment Preview</h3>
@@ -1385,9 +1546,9 @@ const AIAssignmentWriter = () => {
                 <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
                   <ScrollArea className="h-[500px] pr-4">
                     <div className="p-6 prose max-w-none">
-                      <h2 className="text-2xl font-bold text-center mb-4">{assignment.title}</h2>
-                      {assignment.sections &&
-                        assignment.sections.map((section) => (
+                      <h2 className="text-2xl font-bold text-center mb-4">{assignmentPreviewData?.title}</h2>
+                      {assignmentPreviewData?.sections &&
+                        assignmentPreviewData?.sections.map((section) => (
                           <div key={section.id} className="mb-8">
                             <div className="flex justify-between items-center">
                               <h4 className="text-lg font-semibold text-slate-800 mb-3">{section.title}</h4>
@@ -1409,17 +1570,12 @@ const AIAssignmentWriter = () => {
 
                 <div className="flex justify-between items-center">
                   <Button variant="outline" onClick={() => {
-                    setAssignment(null);
-                    setAssignmentGenerated(false)
-                    setApiResponse(null)
-                    setActiveTab("generate")
-
+                    setAssignmentPreview(false)
+                    setAssignmentPreviewData(null)
+                    setActiveTab("assignment")
                   }}>
                     Back to Generate
                   </Button>
-                  {/* <Button variant="outline" className="cursor-pointer" onClick={regenerateAssignment}>
-                    Regenerate Assignment
-                  </Button> */}
                 </div>
               </div>
             ) : (
@@ -1548,4 +1704,4 @@ const AIAssignmentWriter = () => {
   )
 }
 
-export default AIAssignmentWriter
+export default AIAssignmentWriter;
