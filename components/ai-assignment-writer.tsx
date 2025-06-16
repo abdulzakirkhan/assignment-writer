@@ -823,7 +823,7 @@ const AIAssignmentWriter = () => {
                     </div>
                   </CardContent>
                   <CardFooter className="px-6 py-6 -mt-5 w-full">                    
-                    <div className="flex border w-full flex-col gap-3 h-[160px] overflow-y-auto">
+                    <div className="flex w-full flex-col gap-3 h-[160px] overflow-y-auto">
 
                     <UploadFilesPrev
                       uploadedFiles={uploadedFiles.map(file => ({
