@@ -1574,7 +1574,7 @@ const AIAssignmentWriter = () => {
                     setAssignmentPreviewData(null)
                     setActiveTab("assignment")
                   }}>
-                    Back to Generate
+                    Back to Assignemts
                   </Button>
                 </div>
               </div>
