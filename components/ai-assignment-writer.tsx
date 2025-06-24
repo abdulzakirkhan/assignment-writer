@@ -198,8 +198,17 @@ const AIAssignmentWriter = () => {
   const [apiResponse, setApiResponse] = useState<Response | null>(null)
   const baseUrl = "http://192.168.100.127:8000";
 
+  // Define a type for the assignment generation response
+  type AssignmentGenResponse = {
+    polished_assignment: any,
+    [key: string]: any;
+  };
+
+  type section = {
+    content:{}
+  }
   // Generate assignment handler
-  const [assingmentGenResponse, setAssingmentGenResponse] = useState()
+  const [assingmentGenResponse, setAssingmentGenResponse] = useState<AssignmentGenResponse | null>(null)
   const [isGenerateAssignments, setIsGenerateAssignments] = useState(false)
   const generateAssignment = async (assignment_id: any) => {
     try {
@@ -330,7 +339,7 @@ const convertPolishedAssignmentToDetails = (data: any): AssignmentDetails => {
 
 
   // Download assignment with multiple format options
-  const handleDownload = async (format: "txt" | "html" | "docx" | "copy" = "docx") => {
+  const handleDownload = async (format: "txt" | "pdf" | "docx" | "copy" = "docx") => {
     if (!data) return
 
     setIsDownloading(true)
@@ -721,6 +730,7 @@ const convertPolishedAssignmentToDetails = (data: any): AssignmentDetails => {
   };
 
 
+  console.log("references :",data.polished_assignment.references)
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-blue-50">
       {/* Header */}
@@ -760,7 +770,7 @@ const convertPolishedAssignmentToDetails = (data: any): AssignmentDetails => {
                 <Upload className="h-4 w-4" />
                 <span>Upload</span>
               </TabsTrigger>
-              <TabsTrigger value="generate"  className="flex items-center space-x-2">
+              <TabsTrigger value="generate" disabled={responseData ? false : true} className="flex items-center space-x-2">
                 <FileText className="h-4 w-4" />
                 <span>Generate</span>
               </TabsTrigger>
@@ -768,11 +778,11 @@ const convertPolishedAssignmentToDetails = (data: any): AssignmentDetails => {
                 <FileText className="h-4 w-4" />
                 <span>Assingment</span>
               </TabsTrigger> */}
-              <TabsTrigger value="preview"  className="flex items-center space-x-2">
+              <TabsTrigger value="preview" disabled={assingmentGenResponse ? false : true}  className="flex items-center space-x-2">
                 <Eye className="h-4 w-4" />
                 <span>Preview</span>
               </TabsTrigger>
-              <TabsTrigger value="chat" className="flex items-center space-x-2">
+              <TabsTrigger value="chat" disabled={assingmentGenResponse ? false : true} className="flex items-center space-x-2">
                 <MessageSquare className="h-4 w-4" />
                 <span>Q&A Chat</span>
               </TabsTrigger>
@@ -1441,16 +1451,19 @@ const convertPolishedAssignmentToDetails = (data: any): AssignmentDetails => {
                         </div>
                         {Object.entries(assingmentGenResponse?.polished_assignment)
                           .filter(([key]) => key !== "references") // Exclude references
-                          .map(([key, section]) => (
+                        .map(([key, section]) => {
+                          // Type assertion for section
+                          const typedSection = section as { heading: string; content: string | Record<string, any> };
+                          return (
                             <div key={key} className="mb-6">
-                              <h2 className="text-xl font-bold mb-2">{section.heading}</h2>
+                              <h2 className="text-xl font-bold mb-2">{typedSection.heading}</h2>
 
                               {/* If content is a string, render it as a paragraph */}
-                              {typeof section.content === "string" ? (
-                                <p className="text-gray-800 whitespace-pre-line">{section.content}</p>
+                              {typeof typedSection.content === "string" ? (
+                                <p className="text-gray-800 whitespace-pre-line">{typedSection.content}</p>
                               ) : (
                                 // If content is an object, map over its entries
-                                Object.entries(section.content).map(([subKey, subSection]) => (
+                                Object.entries(typedSection.content).map(([subKey, subSection]) => (
                                   <div key={subKey} className="ml-4 mb-4">
                                     <h3 className="text-lg font-semibold mb-1">{subSection.heading}</h3>
                                     <p className="text-gray-700 whitespace-pre-line">{subSection.content}</p>
@@ -1458,12 +1471,13 @@ const convertPolishedAssignmentToDetails = (data: any): AssignmentDetails => {
                                 ))
                               )}
                             </div>
-                        ))}
+                          );
+                        })}
                         <div className="">
                           <h1 className="text-lg lg:text-2xl font-bold mb-2">References</h1>
                           <ul className="list-disc list-inside">
-                            {assingmentGenResponse?.polished_assignment?.references.map((item,index) => (
-                              <li key={index}>{item}</li>
+                            {assingmentGenResponse?.polished_assignment?.references.map((item,ref) => (
+                              <li key={ref}>{item}</li>
                             ))}
                           </ul>
                         </div>
