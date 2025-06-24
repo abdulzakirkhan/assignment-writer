@@ -10,6 +10,42 @@ body {
     text-wrap: balance;
   }
 }
+/* CSS */
+@keyframes typing {
+  from { width: 0 }
+  to { width: 100% }
+}
+@keyframes blink {
+  50% { opacity: 0 }
+}
+.animate-typing {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  animation: typing 2s steps(40) 1s 1 normal both;
+}
+.animate-blink {
+  animation: blink 1s step-end infinite;
+}
+
+/* CSS */
+@keyframes typing {
+  from { width: 0 }
+  to { width: 100% }
+}
+@keyframes blink {
+  50% { opacity: 0 }
+}
+.animate-typing {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  animation: typing 2s steps(40) 1s 1 normal both;
+}
+.animate-blink {
+  animation: blink 1s step-end infinite;
+}
+
 
 @layer base {
   :root {

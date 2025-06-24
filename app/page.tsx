@@ -9,7 +9,7 @@ export default function Home() {
   const router = useRouter();
 
 
-  useEffect(() => {
+  useEffect(() => { 
     const user = localStorage.getItem("user");
     if (!user) {
       router.push("/auth/sign-in");

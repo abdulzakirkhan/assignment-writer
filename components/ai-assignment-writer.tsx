@@ -1,18 +1,15 @@
 "use client"
 import type React from "react"
-import { RxCross1 } from "react-icons/rx";
-import { useState, useRef, useEffect, useId } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useToast } from "@/components/ui/use-toast"
-import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -43,9 +40,9 @@ import {
   X,
   BadgeCheck,
   XCircle,
+  Router,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { v4 as uuidv4 } from "uuid"
 import { useChat } from "ai/react"
 import { processFile } from "@/lib/file-utils"
 import { generateMockAssignment } from "@/lib/mock-assignment"
@@ -58,10 +55,15 @@ import type {
   AssignmentSection,
 } from "@/types/assignment"
 import { REFERENCE_STYLES } from "@/types/assignment"
-import { downloadAsText, downloadAsHTML, downloadAsDocx, copyToClipboard } from "@/lib/document-utils"
+import { downloadAsText, downloadAsHTML, downloadAsDocx, copyToClipboard, downloadAsPdf } from "@/lib/document-utils"
 import UploadFilesPrev from "./ui/UploadFilesPrev";
 import { Table, TableBody, TableHeader, TableRow } from "./ui/table";
-
+import Image from "next/image";
+import Loader from "./Loader";
+import { v4 as uuidv4 } from 'uuid';
+import {data} from './data.js';
+import "katex/dist/katex.min.css";
+import { BlockMath ,InlineMath} from 'react-katex';
 const AIAssignmentWriter = () => {
   const { toast } = useToast()
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -121,12 +123,20 @@ const AIAssignmentWriter = () => {
     },
   })
 
+  const [assignmentFile, setAssignmentFile] = useState<File[] | null>(null)
+  const [moduleMaterialFile, setModuleMaterialFile] = useState<File[] | null>(null)
   // File upload handler
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, category: FileCategory) => {
     if (!event.target.files?.length) return
 
     const files = Array.from(event.target.files)
-
+    // assignment-brief  module-material
+    if(category === "assignment-brief"){
+      setAssignmentFile(files)
+    }
+    if(category === "module-material"){
+      setModuleMaterialFile(files)
+    }
     // Create temporary file entries with uploading status
     const tempFiles: FileInfo[] = files.map((file) => ({
       id: uuidv4(),
@@ -186,229 +196,142 @@ const AIAssignmentWriter = () => {
   }
 
   const [apiResponse, setApiResponse] = useState<Response | null>(null)
+  const baseUrl = "http://192.168.100.127:8000";
 
   // Generate assignment handler
-  const generateAssignment = async () => {
-
-    // Reset error state
-    setApiError(null)
-
-    // Allow generation with no files if using mock data
-    if (uploadedFiles.length === 0 && !useMockData && !debugMode) {
-      toast({
-        title: "No Files",
-        description: "Please upload at least one file before generating an assignment.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setIsGenerating(true)
-    setGenerationProgress(0)
-
-    // Simulate initial progress
-    const progressInterval = setInterval(() => {
-      setGenerationProgress((prev) => {
-        if (prev >= 90) {
-          clearInterval(progressInterval)
-          return prev
-        }
-        return prev + Math.random() * 2 // Slower progress to avoid jumping to 90% too quickly
-      })
-    }, 800)
-
+  const [assingmentGenResponse, setAssingmentGenResponse] = useState()
+  const [isGenerateAssignments, setIsGenerateAssignments] = useState(false)
+  const generateAssignment = async (assignment_id: any) => {
     try {
-
-      // Prepare headers for the request
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      }
-
-      // If debug mode is enabled and user clicked "Use Test Data", add a special header
-      if (debugMode && useMockData) {
-        headers["x-use-mock-data"] = "true"
-      }
-
-      // If we've had API errors and are in debug mode, use mock data as fallback
-      if (apiError && debugMode) {
-        const mockAssignment = generateMockAssignment(generationSettings.referenceStyle, generationSettings.wordCount)
-
-        // Set generation progress to 100%
-        setGenerationProgress(100)
-
-        // Update state
-        setAssignments(mockAssignment)
-        setAssignmentGenerated(true)
-
-        // Switch to preview tab
-        setTimeout(() => {
-          setActiveTab("preview")
-          setIsGenerating(false)
-        }, 1000)
-
-        toast({
-          title: "Assignment Generated (Mock Data)",
-          description: "Using sample data due to API issues. This is for demonstration purposes only.",
-        })
-
-        clearInterval(progressInterval)
-        return
-      }
+      setIsGenerateAssignments(true)
+      const response = await fetch(`${baseUrl}/generate/${assignment_id}`, {
+        method: "GET", 
+      });
 
       
-
-      const response = await fetch("/api/generate-assignment", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          files: uploadedFiles,
-          settings: generationSettings,
-          wordCount: generationSettings.wordCount,
-          referenceStyle: generationSettings.referenceStyle,
-          additionalInstructions: generationSettings.additionalInstructions,
-          copies: generationSettings.copies,
-        }),
-      })
-      // return
-      setApiResponse(response)
-      // return
-
-      // Handle non-OK responses
       if (!response.ok) {
-        let errorMessage = `Error: ${response.status}`
-        try {
-          const errorData = await response.json()
-          errorMessage = errorData.details || errorData.error || errorMessage
-        } catch (e) {
-          // If we can't parse the error as JSON, just use the status code
-        }
-
-        // Set the API error state
-        setApiError(errorMessage)
-
-        throw new Error(errorMessage)
+        throw new Error(`Request failed with status ${response.status}`);
       }
-
-      // Parse the response
-      const result = await response.json()
-
-      // Set generation progress to 100%
-      setGenerationProgress(100)
-
-      // Process the assignment data
-      const assignmentData = {
-        ...result,
-        createdAt: new Date(result.createdAt || new Date()),
-        format: "DOCX",
-        referenceStyle: result.referenceStyle || generationSettings.referenceStyle,
-      }
-
-      // Update state
-      setAssignments(assignmentData)
-      setAssignmentGenerated(true)
-
-      // Switch to preview tab
-      setTimeout(() => {
-        setActiveTab("preview")
-        setIsGenerating(false)
-      }, 1000)
-
-      toast({
-        title: "Assignment Generated",
-        description: "Your assignment has been successfully generated!",
-      })
+      const data = await response.json(); 
+      setAssingmentGenResponse(data);
+      setActiveTab("preview")
+      setIsGenerateAssignments(false)
     } catch (error) {
-
-      clearInterval(progressInterval)
-      setIsGenerating(false)
-
-      // Show error toast
-      toast({
-        title: "Generation Failed",
-        description: error instanceof Error ? error.message : "Failed to generate the assignment. Please try again.",
-        variant: "destructive",
-        action: (
-          <div className="flex space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setRetryCount((prev) => prev + 1)
-                generateAssignment()
-              }}
-            >
-              <RefreshCw className="h-4 w-4 mr-1" />
-              Retry
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setUseMockData(true)
-                generateAssignment()
-              }}
-            >
-              Use Sample Data
-            </Button>
-          </div>
-        ),
-      })
-
-      // If we're in debug mode, offer to use mock data
-      if (debugMode) {
-        toast({
-          title: "Try Mock Data",
-          description: "Click 'Use Test Data' in the debug panel to generate a sample assignment.",
-          action: (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setUseMockData(true)
-                generateAssignment()
-              }}
-            >
-              Use Test Data
-            </Button>
-          ),
-        })
-      }
+      setIsGenerateAssignments(false)
     }
-  }
-
+  };
+  useEffect(() => {
+    if(assingmentGenResponse){
+      // setAssingmentGenResponse()
+      setActiveTab("preview")
+    }
+  }, [])
+  
   // Use mock data as fallback if API fails
   const useMockDataFallback = () => {
     setUseMockData(true)
-    generateAssignment()
+    generateAssignment(responseData ? responseData?.assignment_id : "")
   }
 
   // Chat handlers
-  const handleChatSubmit = async () => {
-    if (!chatInput.trim() || isProcessingChat) return
+  const [questionsAnswers, setQuestionsAnswers] = useState<any[]>([])
+  const handleChatSubmit = async (assignment_id: string) => {
+    if (!chatInput.trim() || isProcessingChat) return;
 
-    setIsProcessingChat(true)
+    setIsProcessingChat(true);
 
     try {
-      await append({
-        role: "user",
-        content: chatInput,
-      })
+      const formData= new FormData()
+      formData.append('question', chatInput ? chatInput : '')
 
-      setChatInput("")
+      const response = await fetch(`${baseUrl}/qna/${assignment_id}`, {
+        method: "POST",
+        // headers: {
+        //   "Content-Type": "application/json",
+        // },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      setQuestionsAnswers((prev) => [...prev, data])
+
     } catch (error) {
-      setIsProcessingChat(false)
-
-      toast({
-        title: "Chat Error",
-        description: "Failed to send message. Please try again.",
-        variant: "destructive",
-      })
+      console.error("Error submitting chat:", error);
+    } finally {
+      setIsProcessingChat(false);
     }
-  }
+  };
   const [copied, setCopied] = useState(false);
+  type AssignmentSection = {
+  title: string;
+  content: string;
+};
+
+type AssignmentDetails = {
+  title: string;
+  createdAt: Date;
+  wordCount: number;
+  referenceStyle: string;
+  sections: AssignmentSection[];
+};
+
+const convertPolishedAssignmentToDetails = (data: any): AssignmentDetails => {
+  const assignment = data?.polished_assignment;
+  const sectionsArray: AssignmentSection[] = [];
+
+  // Loop through each main section
+  Object.entries(assignment).forEach(([key, item]: [string, any]) => {
+    // Skip references — handle them separately
+    if (key === "references") return;
+
+    // If content is a string (e.g., "Introduction"), use it directly
+    if (typeof item.content === "string") {
+      sectionsArray.push({
+        title: item.heading,
+        content: item.content,
+      });
+    }
+
+    // If content is an object (e.g., nested subsections like 2.1, 2.2...)
+    else if (typeof item.content === "object") {
+      Object.values(item.content).forEach((subItem: any) => {
+        sectionsArray.push({
+          title: `${item.heading} - ${subItem.heading}`,
+          content: subItem.content,
+        });
+      });
+    }
+  });
+
+  // Handle references
+  if (Array.isArray(assignment.references)) {
+    sectionsArray.push({
+      title: "References",
+      content: assignment.references.join("\n"),
+    });
+  }
+
+  // Final output
+  return {
+    title: `Assignment on ${data.topic}`,
+    createdAt: new Date(),
+    wordCount: sectionsArray.reduce(
+      (sum, section) => sum + section.content.split(/\s+/).length,
+      0
+    ),
+    referenceStyle: "Harvard",
+    sections: sectionsArray,
+  };
+};
+
+
   // Download assignment with multiple format options
   const handleDownload = async (format: "txt" | "html" | "docx" | "copy" = "docx") => {
-    if (!assignments) return
+    if (!data) return
 
     setIsDownloading(true)
 
@@ -423,33 +346,32 @@ const AIAssignmentWriter = () => {
 
       switch (format) {
         case "txt":
-          downloadAsText(assignments)
+          const res = convertPolishedAssignmentToDetails(data)
+          console.log("res :",res)
+          downloadAsText(res)
           break
-        case "html":
-          downloadAsHTML(assignments)
+        case "pdf":
+          const pdfres =convertPolishedAssignmentToDetails(data)
+          downloadAsPdf(pdfres)
           break
         case "docx":
-          await downloadAsDocx(assignments)
+          const docxres= convertPolishedAssignmentToDetails(data)
+          await downloadAsDocx(docxres)
           break
         case "copy":
-          const success = await copyToClipboard(assignments)
-          if (success) {
-            toast({
-              title: "Copied to Clipboard",
-              description: "Your assignment has been copied to the clipboard.",
-            })
-             setCopied(true);
-
-              // Reset back to "Copy Text" after 2 seconds
-              setTimeout(() => setCopied(false), 2000);
-          } else {
-            toast({
-              title: "Copy Failed",
-              description: "Failed to copy to clipboard. Please try downloading instead.",
-              variant: "destructive",
-            })
-          }
-          break
+        const assignmentDetails = convertPolishedAssignmentToDetails(data);
+        const success = await copyToClipboard(assignmentDetails);
+        if (success) {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        } else {
+          toast({
+            title: "Copy Failed",
+            description: "Failed to copy to clipboard. Please try downloading instead.",
+            variant: "destructive",
+          });
+        }
+        break;
       }
 
       if (format !== "copy") {
@@ -519,14 +441,6 @@ const AIAssignmentWriter = () => {
 
 
 
-  const data= [
-    {
-      title:"Assignment Brief",
-      inputTitle:"Upload Assignment Brief",
-      description:"Upload your assignment requirements and instructions",
-
-    }
-  ]
 
 
 
@@ -734,7 +648,78 @@ const AIAssignmentWriter = () => {
   };
 
 
-  console.log("uploadedFiles",uploadedFiles)
+  type AssignmentExtractedData = {
+    paper_topic?: string;
+    // add other expected properties here as needed
+    [key: string]: any;
+  };
+  const [responseData, setResponseData] = useState<AssignmentExtractedData | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [additionalInformation, setAdditionalInformation] = useState("")
+  // const baseUrl = "http://192.168.100.92:8000"
+  // navigate instance
+  // const navigate = useNavigate();
+  
+  const apiCall = async () => {
+    try {
+      if (assignmentFile && moduleMaterialFile) {
+        setLoading(true)
+        const formData = new FormData();
+        // Append multiple assignment files
+        assignmentFile.forEach((file: File) => {
+          formData.append("file", file);
+        });
+
+        // Append module material file (assuming it's a single file)
+        moduleMaterialFile.forEach((file: File) => {
+          formData.append("helping_material", file);
+        })
+        formData.append("additional_information" , additionalInformation || "");
+        const response = await fetch(`${baseUrl}/new-assignment`, {
+          method: "POST",
+          body: formData,
+        });
+        if(response.ok){
+          const data = await response.json();
+          setResponseData(data.data);
+          setLoading(false)
+        } else {
+          // Optionally handle other redirect logic here
+          setLoading(false)
+          console.error("No URL found in response to redirect.")
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching assignment details:", error);
+      setLoading(false)
+    }
+  };
+
+
+  const [isIngestLoading, setIsIngestLoading] = useState(false)
+  
+  const [ingest, setIngest] = useState(false)
+  const handleIngest = async (assignment_id: string) => {
+    try {
+      setIsIngestLoading(true)
+      const response = await fetch(`${baseUrl}/ingest_assignment/${assignment_id}`, { 
+        method: "GET",
+      });
+
+      
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      setIsIngestLoading(false)
+      setIngest(data ? true :false)
+      console.log("data",data)
+    } catch (error) {
+      setIsIngestLoading(false)
+    }
+  };
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-blue-50">
@@ -744,7 +729,8 @@ const AIAssignmentWriter = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="bg-gradient-to-r from-violet-600 to-indigo-600 p-2.5 rounded-xl">
-                <Brain className="h-6 w-6 text-white" />
+                {/* <Brain className="h-6 w-6 text-white" /> */}
+                <Image src={"/logo.png"} width={100} height={100} alt="Egeeks Global" className="" />
               </div>
               <div>
                 <h1 className="text-xl font-bold bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">
@@ -763,699 +749,797 @@ const AIAssignmentWriter = () => {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        {/* Main Tabs */}
-        <Tabs defaultValue="upload" value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-5 w-full max-w-3xl mx-auto mb-8">
-            <TabsTrigger value="upload" className="flex items-center space-x-2">
-              <Upload className="h-4 w-4" />
-              <span>Upload</span>
-            </TabsTrigger>
-            <TabsTrigger value="generate" disabled={filteredFile ? false : true} className="flex items-center space-x-2">
-              <FileText className="h-4 w-4" />
-              <span>Generate</span>
-            </TabsTrigger>
-            <TabsTrigger value="assignment" className="flex items-center space-x-2">
-              <FileText className="h-4 w-4" />
-              <span>Assingment</span>
-            </TabsTrigger>
-            <TabsTrigger value="preview" disabled={assignmentPreview ? false : true} className="flex items-center space-x-2">
-              <Eye className="h-4 w-4" />
-              <span>Preview</span>
-            </TabsTrigger>
-            <TabsTrigger value="chat" disabled={apiResponse?.ok ? false : true} className="flex items-center space-x-2">
-              <MessageSquare className="h-4 w-4" />
-              <span>Q&A Chat</span>
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Upload Tab Content */}
-          <TabsContent value="upload">
-            <>
-            <div className={`grid ${filesLength === 0 ? "md:grid-cols-2" : filesLength === 1 ? "md:grid-cols-3" : filesLength >= 2 ? "md:grid-cols-3" : "md:grid-cols-2"} gap-8`}>
-                {/* Assignment Brief Upload */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center">
-                      <FileSymlink className="h-5 w-5 mr-2 text-violet-600" />
-                      Assignment Brief
-                    </CardTitle>
-                    <CardDescription>Upload your assignment requirements and instructions</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 hover:border-violet-500 transition-colors">
-                      <input
-                        type="file" required
-                        multiple
-                        onChange={(e) => handleFileUpload(e, "assignment-brief")}
-                        className="hidden"
-                        id="assignment-brief-upload"
-                        ref={assignmentBriefInputRef}
-                        accept=".pdf,.doc,.docx,.txt"
-                      />
-                      <div
-                        className="text-center cursor-pointer"
-                        onClick={() => triggerFileInput(assignmentBriefInputRef)}
-                      >
-                        <FileText className="mx-auto h-8 w-8 text-violet-500 mb-2" />
-                        <p className="text-sm font-medium text-slate-700">Upload Assignment Brief</p>
-                        <p className="text-xs text-slate-500 mt-1">PDF, DOC, DOCX, TXT</p>
-
-                        {getFilesCountByCategory("assignment-brief") > 0 && (
-                          <Badge variant="secondary" className="mt-2">
-                            {getFilesCountByCategory("assignment-brief")} file(s) uploaded
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="px-6 py-6 -mt-5 w-full">                    
-                    <div className="flex w-full flex-col gap-3 max-h-[160px] overflow-y-auto">
-                    <UploadFilesPrev
-                      uploadedFiles={uploadedFiles.map(file => ({
-                        ...file,
-                        type:
-                          file.type === "PDF"
-                            ? "PDF"
-                            : file.type === "DOC"
-                            ? "DOC"
-                            : file.type === "DOCS"
-                            ? "DOCS"
-                            : "OTHER",
-                      }))}
-                      removeFile={removeFile}
-                      indexNo={"assignment-brief"}
-                    />
-                    </div>
-                  </CardFooter>
-                </Card>
-
-                {/* Module Material Upload */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center">
-                      <BookMarked className="h-5 w-5 mr-2 text-emerald-600" />
-                      Module Material
-                    </CardTitle>
-                    <CardDescription>Upload lecture notes, slides, and course materials</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 hover:border-emerald-500 transition-colors">
-                      <input
-                        type="file"
-                        multiple required
-                        onChange={(e) => handleFileUpload(e, "module-material")}
-                        className="hidden"
-                        id="module-material-upload"
-                        ref={moduleInputRef}
-                        accept=".pdf,.doc,.docx,.txt"
-                      />
-                      <div className="text-center cursor-pointer" onClick={() => triggerFileInput(moduleInputRef)}>
-                        <Book className="mx-auto h-8 w-8 text-emerald-500 mb-2" />
-                        <p className="text-sm font-medium text-slate-700">Upload Module Material</p>
-                        <p className="text-xs text-slate-500 mt-1">PDF, DOC, DOCX, TXT</p>
-
-                        {getFilesCountByCategory("module-material") > 0 && (
-                          <Badge variant="secondary" className="mt-2">
-                            {getFilesCountByCategory("module-material")} file(s) uploaded
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="px-6 py-6 -mt-5 w-full">       
-                    <div className="flex flex-col w-full gap-3 max-h-[160px] overflow-y-auto">
-                      <UploadFilesPrev
-                        uploadedFiles={uploadedFiles.map(file => ({
-                          ...file,
-                          type:
-                            file.type === "PDF"
-                              ? "PDF"
-                              : file.type === "DOC"
-                              ? "DOC"
-                              : file.type === "DOCS"
-                              ? "DOCS"
-                              : "OTHER",
-                        }))}
-                        removeFile={removeFile}
-                        indexNo={"module-material"}
-                      />
-                    </div>             
-                  </CardFooter>
-                </Card>
-
-               
-                {/* Provided Materials */}
-
-                {filteredFile && (
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-lg flex items-center">
-                        <FileTextIcon className="h-5 w-5 mr-2 text-violet-600" />
-                        Provided Assignment
-                      </CardTitle>
-                      <CardDescription>Provided reference, papers topic, paper type deadline</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 space-y-3">
-                        {/* Paper Topic row */}
-                        <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
-                          <span className="text-sm text-gray-600">Paper Topic</span>
-                          <XCircle className="h-4 w-4 text-red-600" />
-                        </div>
-                        {/* Paper Topic row */}
-                        <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
-                          <span className="text-sm text-gray-600">Assignment Type</span>
-                          <BadgeCheck className="h-4 w-4 text-green-600" />
-                        </div>
-                        {/* Deadline row */}
-                        <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
-                          <span className="text-sm text-gray-600">Deadline</span>
-                          <BadgeCheck className="h-4 w-4 text-green-600" />
-                        </div>
-
-                        {/* Paper Topic row */}
-                        <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
-                          <span className="text-sm text-gray-600">Reference Style</span>
-                          <XCircle className="h-4 w-4 text-red-600" />
-                        </div>
-                        {/* Paper Topic row */}
-                        <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
-                          <span className="text-sm text-gray-600">Word Count</span>
-                          <XCircle className="h-4 w-4 text-red-600" />
-                        </div>
-                        {/* Paper Topic row */}
-                        <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
-                          <span className="text-sm text-gray-600">Additional Instructions</span>
-                          <BadgeCheck className="h-4 w-4 text-green-600" />
-                        </div>
-
-                        <div className="">
-                          
-                        </div>
-                      </div>
-                    </CardContent>
-                    <CardFooter className="px-6 -mt-5">
-                    </CardFooter>
-                  </Card>
-                )}
-               
-
-            </div>
-            <div className="flex items-center justify-center py-8">
-              {filteredFile && moduleFile &&  (
-
-                <Button
-                  className="bg-gradient-to-r cursor-pointer from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
-                  onClick={() => setActiveTab("generate")}
-                >
-                  Continue to Generate
-                  <ChevronRight className="ml-2 h-4 w-4" />
-                </Button>
-              ) }         
-            </div>
-            </>
-          </TabsContent>
-
-          {/* Generate Tab Content */}
-          <TabsContent value="generate">
-            <Card className="max-w-3xl mx-auto">
-              <CardContent className="p-8">
-                <div className="text-center mb-8">
-                  <div className="mx-auto w-20 h-20 bg-gradient-to-br from-emerald-100 to-sky-100 rounded-full flex items-center justify-center mb-5">
-                    <Sparkles className="h-10 w-10 text-emerald-600" />
-                  </div>
-                  <h3 className="text-xl font-bold text-slate-800 mb-2">Generate Assignment</h3>
-                  <p className="text-slate-600 text-sm max-w-md mx-auto">
-                    Our AI will analyze your uploaded files and generate a comprehensive, well-structured assignment
-                  </p>
-                </div>
-
-                {apiError && (
-                  <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-                    <div className="flex items-start space-x-3">
-                      <AlertCircle className="h-5 w-5 text-red-500 mt-0.5" />
-                      <div>
-                        <h4 className="text-sm font-medium text-red-800">API Error Detected</h4>
-                        <p className="text-xs text-red-700 mt-1">{apiError}</p>
-                        <div className="mt-3 flex space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-xs bg-white"
-                            onClick={() => {
-                              setApiError(null)
-                              setRetryCount((prev) => prev + 1)
-                              generateAssignment()
-                            }}
-                          >
-                            <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                            Retry
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-xs bg-white"
-                            onClick={useMockDataFallback}
-                          >
-                            Use Sample Data
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {!assignmentGenerated && !isGenerating && (
-                  <div className="space-y-6">
-                    <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-                      <h4 className="text-sm font-medium text-slate-800 mb-3 flex items-center">
-                        <Settings className="h-4 w-4 mr-2 text-slate-600" />
-                        Generation Settings
-                      </h4>
-
-                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        {/* assignment id */}
-                        <div className="w-full">
-                          <label className="text-xs font-medium text-slate-700">Assignment ID</label>
-                          <Input
-                            value={assignmentId} disabled={assignmentId ? true : false}
-                            onChange={(e) => handleChangeAssignmentId(Number(e.target.value))}
-                            className="h-8 text-xs"
-                            type="text"
-                            placeholder="Enter assignment ID"
-                          />
-                        </div>
-                        <div className="w-full">
-                          <label className="text-xs font-medium text-slate-700">Assignment Type</label>
-                          <Input
-                            value={assignmentType}
-                            onChange={(e) => setAssignmentType(e.target.value)}
-                            className="h-8 text-xs"
-                            type="text"
-                            placeholder="Enter assignment ID"
-                          />
-                        </div>
-                        <div className="w-full">
-                          <label className="text-xs font-medium text-slate-700">Assignment Topic</label>
-                          <Input
-                            value={assignmentTopic}
-                            onChange={(e) => setAssignmentTopic(e.target.value)}
-                            className="h-8 text-xs"
-                            type="text"
-                            placeholder="Enter assignment ID"
-                          />
-                        </div>
-                        <div className="w-full">
-                          <label className="text-xs font-medium text-slate-700">Assignment Deadline</label>
-                          <Input
-                            // onclick will open date picker
-                            onClick={() => { setTimeout(() => {
-                                const input = document.querySelector('input[type="date"]') as HTMLInputElement;
-                                if (input) input.showPicker();
-                              }, 0);
-                            }}
-                            value={formatDateForInput(deadline)}
-                            onChange={(e) => setDeadline(new Date(e.target.value).getTime())}
-                            className="h-8 text-xs"
-                            type="date"
-                          />
-                        </div>
-                      </div>  
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <label className="text-xs font-medium text-slate-700">Word Count <span className="text-xl text-red-500 inline-flex align-middle">*</span> </label>
-                          <div className="flex flex-col space-x-2">
-                            <Input
-                              value={generationSettings.wordCount}
-                              onChange={(e) =>
-                                setGenerationSettings({
-                                  ...generationSettings,
-                                  wordCount: Number.parseInt(e.target.value),
-                                })
-                              }
-                              className="h-8 text-xs"
-                              type="number"
-                              min={500}
-                              max={10000}
+        {loading && (
+          <Loader text={"Generating Assignment"} />
+        )}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+          {/* Main Tabs */}
+          <Tabs defaultValue="upload" value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid grid-cols-5 w-full max-w-3xl mx-auto mb-8">
+              <TabsTrigger value="upload" className="flex items-center space-x-2">
+                <Upload className="h-4 w-4" />
+                <span>Upload</span>
+              </TabsTrigger>
+              <TabsTrigger value="generate"  className="flex items-center space-x-2">
+                <FileText className="h-4 w-4" />
+                <span>Generate</span>
+              </TabsTrigger>
+              {/* <TabsTrigger value="assignment" className="flex items-center space-x-2">
+                <FileText className="h-4 w-4" />
+                <span>Assingment</span>
+              </TabsTrigger> */}
+              <TabsTrigger value="preview"  className="flex items-center space-x-2">
+                <Eye className="h-4 w-4" />
+                <span>Preview</span>
+              </TabsTrigger>
+              <TabsTrigger value="chat" className="flex items-center space-x-2">
+                <MessageSquare className="h-4 w-4" />
+                <span>Q&A Chat</span>
+              </TabsTrigger>
+            </TabsList>
+                {/* Upload Tab Content */}
+                <TabsContent value="upload">
+                  <>
+                  <div className={`grid ${responseData === null ? "md:grid-cols-2" : "md:grid-cols-3"} gap-8`}>
+                      {/* Assignment Brief Upload */}
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-lg flex items-center">
+                            <FileSymlink className="h-5 w-5 mr-2 text-violet-600" />
+                            Assignment Brief
+                          </CardTitle>
+                          <CardDescription>Upload your assignment requirements and instructions</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 hover:border-violet-500 transition-colors">
+                            <input
+                              type="file" required
+                              multiple
+                              onChange={(e) => handleFileUpload(e, "assignment-brief")}
+                              className="hidden"
+                              id="assignment-brief-upload"
+                              ref={assignmentBriefInputRef}
+                              accept=".pdf,.doc,.docx,.txt,.zip"
                             />
-                            {/* <span className="text-xs text-slate-500">words</span> */}
-                            {generationSettings.wordCount < 500 && (
-                              <p className="text-red-500 text-xs mt-3">Word count must be at least 500</p>
-                            )}
-                          </div>
-                        </div>
+                            <div
+                              className="text-center cursor-pointer"
+                              onClick={() => triggerFileInput(assignmentBriefInputRef)}
+                            >
+                              <FileText className="mx-auto h-8 w-8 text-violet-500 mb-2" />
+                              <p className="text-sm font-medium text-slate-700">Upload Assignment Brief</p>
+                              <p className="text-xs text-slate-500 mt-1">PDF, DOC, DOCX, TXT</p>
 
-                        <div className="space-y-1">
-                          <label className="text-xs font-medium text-slate-700">Reference Style</label>
-                          <Select
-                            value={generationSettings.referenceStyle}
-                            onValueChange={(value) =>
-                              setGenerationSettings({
-                                ...generationSettings,
-                                referenceStyle: value,
-                              })
-                            }
-                          >
-                            <SelectTrigger className="h-8 text-xs">
-                              <SelectValue placeholder="Select style" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {REFERENCE_STYLES.map((style) => (
-                                <SelectItem key={style} value={style} className="text-xs">
-                                  {style}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 space-y-1">
-                        <label className="text-xs font-medium text-slate-700">Additional Instructions</label>
-                        <Textarea
-                          placeholder="Enter any specific requirements or preferences..."
-                          value={generationSettings.additionalInstructions}
-                          onChange={(e) =>
-                            setGenerationSettings({
-                              ...generationSettings,
-                              additionalInstructions: e.target.value,
-                            })
-                          }
-                          className="text-xs min-h-[60px]"
-                        />
-                      </div>
-
-                      <div className="mt-4 flex items-center space-x-4">
-                        <div className="space-y-1 flex-1">
-                          <label className="text-xs font-medium text-slate-700">Number of Copies</label>
-                          <div className="flex items-center space-x-2">
-                            <Input
-                              value={generationSettings.copies}
-                              onChange={(e) =>
-                                setGenerationSettings({
-                                  ...generationSettings,
-                                  copies: Number.parseInt(e.target.value),
-                                })
-                              }
-                              className="h-8 text-xs"
-                              type="number"
-                              min={1}
-                              max={5}
-                            />
-                            <div className="flex items-center space-x-1">
-                              <Copy className="h-3.5 w-3.5 text-slate-500" />
-                              <span className="text-xs text-slate-500">copies</span>
+                              {getFilesCountByCategory("assignment-brief") > 0 && (
+                                <Badge variant="secondary" className="mt-2">
+                                  {getFilesCountByCategory("assignment-brief")} file(s) uploaded
+                                </Badge>
+                              )}
                             </div>
                           </div>
-                        </div>
+                        </CardContent>
+                        <CardFooter className="px-6 py-6 -mt-5 w-full">                    
+                          <div className="flex w-full flex-col gap-3 max-h-[160px] overflow-y-auto">
+                          <UploadFilesPrev
+                            uploadedFiles={uploadedFiles.map(file => ({
+                              ...file,
+                              type:
+                                file.type === "PDF"
+                                  ? "PDF"
+                                  : file.type === "DOC"
+                                  ? "DOC"
+                                  : file.type === "DOCS"
+                                  ? "DOCS"
+                                  : "OTHER",
+                            }))}
+                            removeFile={removeFile}
+                            indexNo={"assignment-brief"}
+                          />
+                          </div>
+                        </CardFooter>
+                      </Card>
 
-                        <div className="flex-1">
-                          <div className="bg-amber-50 p-2 rounded-md border border-amber-100">
-                            <div className="flex items-start space-x-2">
-                              <Info className="h-3.5 w-3.5 text-amber-600 mt-0.5" />
-                              <p className="text-xs text-amber-800">
-                                Multiple copies will generate unique variations of the same assignment
-                              </p>
+                      {/* Module Material Upload */}
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-lg flex items-center">
+                            <BookMarked className="h-5 w-5 mr-2 text-emerald-600" />
+                            Module Material
+                          </CardTitle>
+                          <CardDescription>Upload lecture notes, slides, and course materials</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 hover:border-emerald-500 transition-colors">
+                            <input
+                              type="file"
+                              multiple required
+                              onChange={(e) => handleFileUpload(e, "module-material")}
+                              className="hidden"
+                              id="module-material-upload"
+                              ref={moduleInputRef}
+                              accept=".pdf,.doc,.docx,.txt,.zip"
+                            />
+                            <div className="text-center cursor-pointer" onClick={() => triggerFileInput(moduleInputRef)}>
+                              <Book className="mx-auto h-8 w-8 text-emerald-500 mb-2" />
+                              <p className="text-sm font-medium text-slate-700">Upload Module Material</p>
+                              <p className="text-xs text-slate-500 mt-1">PDF, DOC, DOCX, TXT</p>
+
+                              {getFilesCountByCategory("module-material") > 0 && (
+                                <Badge variant="secondary" className="mt-2">
+                                  {getFilesCountByCategory("module-material")} file(s) uploaded
+                                </Badge>
+                              )}
                             </div>
                           </div>
-                        </div>
-                      </div>
-                    </div>
+                        </CardContent>
+                        <CardFooter className="px-6 py-6 -mt-5 w-full">       
+                          <div className="flex flex-col w-full gap-3 max-h-[160px] overflow-y-auto">
+                            <UploadFilesPrev
+                              uploadedFiles={uploadedFiles.map(file => ({
+                                ...file,
+                                type:
+                                  file.type === "PDF"
+                                    ? "PDF"
+                                    : file.type === "DOC"
+                                    ? "DOC"
+                                    : file.type === "DOCS"
+                                    ? "DOCS"
+                                    : "OTHER",
+                              }))}
+                              removeFile={removeFile}
+                              indexNo={"module-material"}
+                            />
+                          </div>             
+                        </CardFooter>
+                      </Card>
 
-                    <div className="text-center">
-                      <div className="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-3">
-                        <Button
-                          onClick={generateAssignment}
-                          disabled={
-                            (uploadedFiles.length === 0 && !useMockData && !debugMode) ||
-                            generationSettings.wordCount < 500
-                          }
-                          className="bg-gradient-to-r from-emerald-500 to-sky-500 hover:from-emerald-600 hover:to-sky-600 px-8 py-6 h-auto text-base"
-                        >
-                          <Zap className="mr-2 h-5 w-5" />
-                          Generate Assignment
-                        </Button>
+                    
+                      {/* Provided Materials */}
 
-                        {debugMode && (
-                          <Button
-                            onClick={useMockDataFallback}
-                            variant="outline"
-                            className="px-8 py-6 h-auto text-base"
-                          >
-                            Use Sample Data
-                          </Button>
-                        )}
-                      </div>
+                      {responseData && (
+                        <Card>
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-lg flex items-center">
+                              <FileTextIcon className="h-5 w-5 mr-2 text-violet-600" />
+                              Provided Assignment
+                            </CardTitle>
+                            <CardDescription>Provided reference, papers topic, paper type deadline</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-1 space-y-3">
+                              {/* Paper Topic row */}
+                              <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
+                                <span className="text-sm text-gray-600">Paper Topic</span>
+                                {responseData?.paper_topic ? responseData?.paper_topic : <XCircle className="h-4 w-4 text-red-600" />}
+                              </div>
+                              {/* Paper Topic row */}
+                              <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
+                                <span className="text-sm text-gray-600">Assignment Type</span>
+                                {responseData?.assignment_type ? responseData?.assignment_type : <BadgeCheck className="h-4 w-4 text-green-600" />}
+                              </div>
+                              {/* Deadline row */}
+                              <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
+                                <span className="text-sm text-gray-600">Deadline</span>
+                                {responseData?.deadline ? responseData?.deadline : <BadgeCheck className="h-4 w-4 text-green-600" />}
+                              </div>
 
-                      {uploadedFiles.length === 0 && !useMockData && !debugMode && (
-                        <p className="text-red-500 text-xs mt-3">Please upload files first</p>
+                              {/* Paper Topic row */}
+                              <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
+                                <span className="text-sm text-gray-600">Reference Style</span>
+                                {responseData?.citation_style ? responseData?.citation_style : <XCircle className="h-4 w-4 text-red-600" />}
+                              </div>
+                              {/* Paper Topic row */}
+                              <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
+                                <span className="text-sm text-gray-600">Word Count</span>
+                                {responseData?.word_count ? responseData?.word_count : <XCircle className="h-4 w-4 text-red-600" />}
+                              </div>
+                              {/* Paper Topic row */}
+                              <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
+                                <span className="text-sm text-gray-600">Unversity Name</span>
+                                {responseData?.university_name ? responseData?.university_name : <BadgeCheck className="h-4 w-4 text-green-600" />}
+                              </div>
+                            </div>
+                          </CardContent>
+                          <CardFooter className="px-6 -mt-5">
+                          </CardFooter>
+                        </Card>
                       )}
-                      
+                    
+
+                  </div>
+                  <div className="grid grid-cols-1">
+                    <div className="mt-4">
+                      {/* border to input */}
+                      <textarea rows={5} value={additionalInformation} onChange={(e) => setAdditionalInformation(e.target.value)} placeholder="Additional Information" className="w-full p-2 border border-gray-300 rounded-md focus:border-gray-500 outline-0" style={{resize:"none"}} />
                     </div>
                   </div>
-                )}
+                  <div className="flex items-center justify-center py-8">
+                    {assignmentFile && moduleMaterialFile &&  (
+                      <Button
+                        className="bg-gradient-to-r cursor-pointer from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
+                        onClick={apiCall}
+                      >
+                        Click To Proccess
+                        <ChevronRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    ) }         
+                  </div>
+                  </>
+                </TabsContent>
 
-                {isGenerating && (
-                  <div className="space-y-6">
-                    <div className="text-center">
-                      <div className="inline-flex items-center space-x-3 bg-sky-50 px-5 py-3 rounded-lg">
-                        <Loader2 className="h-5 w-5 text-sky-600 animate-spin" />
-                        <span className="text-sky-600 font-medium text-sm">Generating your assignment...</span>
+                {/* Generate Tab Content */}
+                <TabsContent value="generate">
+                  <Card className="max-w-3xl mx-auto">
+                    <CardContent className="p-8">
+                      <div className="text-center mb-8">
+                        <div className="mx-auto w-20 h-20 bg-gradient-to-br from-emerald-100 to-sky-100 rounded-full flex items-center justify-center mb-5">
+                          <Sparkles className="h-10 w-10 text-emerald-600" />
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-800 mb-2">Generate Assignment</h3>
+                        <p className="text-slate-600 text-sm max-w-md mx-auto">
+                          Our AI will analyze your uploaded files and generate a comprehensive, well-structured assignment
+                        </p>
                       </div>
-                    </div>
 
-                    <Progress value={generationProgress} className="h-2" />
-
-                    <p className="text-slate-600 text-sm text-center">
-                      Please be patient, this may take a few minutes.
-                    </p>
-
-                    {debugMode && (
-                      <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                        <h4 className="text-xs font-semibold text-slate-700 mb-2">Debug Information</h4>
-                        <div className="space-y-1 text-xs text-slate-600">
-                          <p>API Key Status: {process.env.GOOGLE_GENERATIVE_AI_API_KEY ? "Available" : "Not Found"}</p>
-                          <p>Files Count: {uploadedFiles.length}</p>
-                          <p>Word Count: {generationSettings.wordCount}</p>
-                          <p>Reference Style: {generationSettings.referenceStyle}</p>
-                          <p>Retry Count: {retryCount}</p>
-                          <div className="flex space-x-2 mt-2">
-                            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={useMockDataFallback}>
-                              Use Sample Data
-                            </Button>
+                      {apiError && (
+                        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                          <div className="flex items-start space-x-3">
+                            <AlertCircle className="h-5 w-5 text-red-500 mt-0.5" />
+                            <div>
+                              <h4 className="text-sm font-medium text-red-800">API Error Detected</h4>
+                              <p className="text-xs text-red-700 mt-1">{apiError}</p>
+                              <div className="mt-3 flex space-x-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-xs bg-white"
+                                  onClick={() => {
+                                    setApiError(null)
+                                    setRetryCount((prev) => prev + 1)
+                                    generateAssignment()
+                                  }}
+                                >
+                                  <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                                  Retry
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-xs bg-white"
+                                  onClick={useMockDataFallback}
+                                >
+                                  Use Sample Data
+                                </Button>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                      )}
+                      {isIngestLoading && (
+                        <Loader text={"Save Material Documents To DB"} />
+                      )}
 
-                {assignmentGenerated && assignments && (
-                  <div className="space-y-6">
-                    <div className="text-center">
-                      <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-3" />
-                      <h3 className="text-xl font-bold text-slate-800 mb-2">Assignment Generated!</h3>
-                      <p className="text-slate-600 text-sm">
-                        Your AI-generated assignment is ready for preview and download.
-                      </p>
+                      {isGenerateAssignments && (
+                        <Loader text={"Generating Assignment"} />
+                      )}
 
-                      <div className="mt-6 flex justify-center space-x-3">
-                        <Button onClick={() => setActiveTab("preview")}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          View Assignment
-                        </Button>
-                        <Button variant="outline" onClick={() => handleDownload("docx")}>
-                          <FileText className="mr-2 h-4 w-4" />
-                          Download DOCX
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+                      {!assignmentGenerated && !isGenerating && (
+                        <div className="space-y-6">
+                          <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                            <h4 className="text-sm font-medium text-slate-800 mb-3 flex items-center">
+                              <Settings className="h-4 w-4 mr-2 text-slate-600" />
+                              Generation Settings
+                            </h4>
 
-          {/* assignment Tab Content */}
-          <TabsContent value="assignment">
-            {assignmentsData ? (
-              <Table className="">
-                    <TableHeader className="">
-                      <TableRow>
-                        <th className="px-6 py-3 border border-gray-300 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">S.No</th>
-                        <th className="px-6 py-3 border border-gray-300 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
-                        <th className="px-6 py-3 border border-gray-300  text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                      </TableRow>
-                    </TableHeader>
-                     <TableBody>
-                {
-                  assignmentsData.map((assignment,index) => (
-                    <TableRow key={assignment.id}>
-                      <td className="px-6 border border-gray-300 py-4 whitespace-nowrap text-sm text-gray-700">{index + 1}</td>
-                      <td className="px-6 border border-gray-300 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{assignment.title}</td>
-                      <td className="px-6 border border-gray-300 py-4 whitespace-nowrap text-sm text-right space-x-2">
-                        <Button
-                          variant="outline"
-                          className="cursor-pointer"
-                          onClick={() => {
-                            setAssignmentPreview(true);
-                            setAssignmentPreviewData(assignment);
-                            setActiveTab("preview");
-                          }}
-                        >
-                          Preview
-                        </Button>
-                      </td>
-                    </TableRow>
-                  ))
-                }
-                </TableBody>
-              </Table>
-            ) : (
-              <div className="text-center py-24">
-                <FileText className="mx-auto h-12 w-12 text-slate-300 mb-3" />
-                <p className="text-slate-500 text-sm">No assignment generated yet</p>
-                <p className="text-slate-400 text-xs mt-1">Generate an assignment to preview it here</p>
-              </div>
-            )}
-          </TabsContent>
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                              {/* assignment id */}
+                              <div className="w-full">
+                                <label className="text-xs font-medium text-slate-700">Assignment ID</label>
+                                <Input
+                                  disabled={responseData ? true : false}
+                                  value={responseData ? responseData?.assignment_id :assignmentId}
+                                  onChange={(e) => handleChangeAssignmentId(Number(e.target.value))}
+                                  className="h-8 text-xs"
+                                  type="text"
+                                  placeholder="Enter assignment ID"
+                                />
+                              </div>
+                              <div className="w-full">
+                                <label className="text-xs font-medium text-slate-700">Assignment Type</label>
+                                <Input
+                                  disabled={responseData ? true : false}
+                                  value={responseData ? responseData?.assignment_type : assignmentType}
+                                  onChange={(e) => setAssignmentType(e.target.value)}
+                                  className="h-8 text-xs"
+                                  type="text"
+                                  placeholder="Enter assignment ID"
+                                />
+                              </div>
+                              <div className="w-full">
+                                <label className="text-xs font-medium text-slate-700">Assignment Topic</label>
+                                <Input
+                                  disabled={responseData ? true : false}
+                                  value={responseData ? responseData?.paper_topic : assignmentTopic}
+                                  onChange={(e) => setAssignmentTopic(e.target.value)}
+                                  className="h-8 text-xs"
+                                  type="text"
+                                  placeholder="Enter assignment ID"
+                                />
+                              </div>
+                              <div className="w-full">
+                                <label className="text-xs font-medium text-slate-700">Assignment Deadline</label>
+                                <Input
+                                  disabled={responseData ? true : false}
+                                  // onclick will open date picker
+                                  onClick={() => { setTimeout(() => {
+                                      const input = document.querySelector('input[type="date"]') as HTMLInputElement;
+                                      if (input) input.showPicker();
+                                    }, 0);
+                                  }}
+                                  // value={formatDateForInput(deadline)}
+                                  value={responseData ? responseData?.deadline : formatDateForInput(deadline)}
+                                  onChange={(e) => setDeadline(new Date(e.target.value).getTime())}
+                                  className="h-8 text-xs"
+                                  type={responseData ? "text" : "date"}
+                                />
+                              </div>
+                            </div>  
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-1">
+                                <label className="text-xs font-medium text-slate-700">Word Count <span className="text-xl text-red-500 inline-flex align-middle">*</span> </label>
+                                <div className="flex flex-col space-x-2">
+                                  <Input
+                                    disabled={responseData ? true : false}
+                                    value={responseData ? responseData?.word_count : generationSettings.wordCount}
+                                    onChange={(e) =>
+                                      setGenerationSettings({
+                                        ...generationSettings,
+                                        wordCount: Number.parseInt(e.target.value),
+                                      })
+                                    }
+                                    className="h-8 text-xs"
+                                    type="number"
+                                    min={500}
+                                    max={10000}
+                                  />
+                                  {/* <span className="text-xs text-slate-500">words</span> */}
+                                  {/* {generationSettings.wordCount < 500 && (
+                                    <p className="text-red-500 text-xs mt-3">Word count must be at least 500</p>
+                                  )} */}
+                                  { responseData ? responseData?.word_count < 500 : generationSettings.wordCount < 500 && (
+                                    <p className="text-red-500 text-xs mt-3">Word count must be at least 500</p>
+                                  )}
+                                </div>
+                              </div>
 
-          {/* Preview Tab Content */}
-          <TabsContent value="preview">
-            {assignmentPreview && assignmentPreviewData ? (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-bold text-slate-800">Assignment Preview</h3>
-                  <div className="flex items-center space-x-3">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button variant="outline" className="cursor-pointer" size="sm" onClick={() => handleDownload("copy")}>
-                            <Copy className="h-4 w-4 mr-2" />
-                            {copied ? "Copied !" : "Copy Text"}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Copy the assignment text to clipboard</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                    <Button variant="outline" className="cursor-pointer" size="sm" onClick={() => handleDownload("txt")}>
-                      Download TXT
-                    </Button>
-                    <Button variant="outline" className="cursor-pointer" size="sm" onClick={() => handleDownload("html")}>
-                      Download HTML
-                    </Button>
-                    <Button variant="outline" className="cursor-pointer" size="sm" onClick={() => handleDownload("docx")}>
-                      Download DOCX
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-                  <ScrollArea className="h-[500px] pr-4">
-                    <div className="p-6 prose max-w-none">
-                      <h2 className="text-2xl font-bold text-center mb-4">{assignmentPreviewData?.title}</h2>
-                      {assignmentPreviewData?.sections &&
-                        assignmentPreviewData?.sections.map((section) => (
-                          <div key={section.id} className="mb-8">
-                            <div className="flex justify-between items-center">
-                              <h4 className="text-lg font-semibold text-slate-800 mb-3">{section.title}</h4>
-                              <Button variant="outline" className="cursor-pointer" onClick={() => {
-                                setIsShowSection(!isShowSection);
-                                setSectionData(section);
-                              }}>Edit</Button>
+                              <div className="space-y-1">
+                                <label className="text-xs font-medium text-slate-700">Reference Style</label>
+                                <Select
+                                disabled={responseData ? true : false}
+                                  value={responseData ? responseData?.citation_style : generationSettings.referenceStyle}
+                                  onValueChange={(value) =>
+                                    setGenerationSettings({
+                                      ...generationSettings,
+                                      referenceStyle: value,
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger className="h-8 text-xs">
+                                    <SelectValue placeholder="Select style" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {REFERENCE_STYLES.map((style) => (
+                                      <SelectItem key={style} value={style} className="text-xs">
+                                        {style}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
                             </div>
-                            {section.content.split("\n\n").map((paragraph, idx) => (
-                              <p key={idx} className="text-slate-700 mb-4">
-                                {paragraph}
-                              </p>
-                            ))}
+
+                            {/* <div className="mt-4 space-y-1">
+                              <label className="text-xs font-medium text-slate-700">Additional Instructions</label>
+                              <Textarea
+                                placeholder="Enter any specific requirements or preferences..."
+                                value={generationSettings.additionalInstructions}
+                                onChange={(e) =>
+                                  setGenerationSettings({
+                                    ...generationSettings,
+                                    additionalInstructions: e.target.value,
+                                  })
+                                }
+                                className="text-xs min-h-[60px]"
+                              />
+                            </div> */}
+
+                            <div className="mt-4 flex items-center space-x-4">
+                              <div className="space-y-1 flex-1">
+                                <label className="text-xs font-medium text-slate-700">Number of Copies</label>
+                                <div className="flex items-center space-x-2">
+                                  <Input
+                                    value={generationSettings.copies}
+                                    onChange={(e) =>
+                                      setGenerationSettings({
+                                        ...generationSettings,
+                                        copies: Number.parseInt(e.target.value),
+                                      })
+                                    }
+                                    className="h-8 text-xs"
+                                    type="number"
+                                    min={1}
+                                    max={5}
+                                  />
+                                  <div className="flex items-center space-x-1">
+                                    <Copy className="h-3.5 w-3.5 text-slate-500" />
+                                    <span className="text-xs text-slate-500">copies</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex-1">
+                                <div className="bg-amber-50 p-2 rounded-md border border-amber-100">
+                                  <div className="flex items-start space-x-2">
+                                    <Info className="h-3.5 w-3.5 text-amber-600 mt-0.5" />
+                                    <p className="text-xs text-amber-800">
+                                      Multiple copies will generate unique variations of the same assignment
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
                           </div>
+
+                          <div className="text-center">
+                            <div className="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-3">
+                              <Button disabled={ingest ? true : false} className="cursor-pointer px-8 py-8 mt-1" variant="outline" onClick={(e) => handleIngest(responseData ? responseData?.assignment_id : assignmentId)}>Ingest</Button>
+                              <Button
+                                onClick={() => generateAssignment(responseData ? responseData.assignment_id : null)}
+                                disabled={
+                                  (uploadedFiles.length === 0 && !useMockData && !debugMode) ||
+                                  generationSettings.wordCount < 500
+                                }
+                                className="bg-gradient-to-r cursor-pointer from-emerald-500 to-sky-500 hover:from-emerald-600 hover:to-sky-600 px-8 py-6 h-auto text-base"
+                              >
+                                <Zap className="mr-2 h-5 w-5" />
+                                Generate Assignment
+                              </Button>
+
+                              {debugMode && (
+                                <Button
+                                  onClick={useMockDataFallback}
+                                  variant="outline"
+                                  className="px-8 py-6 h-auto text-base"
+                                >
+                                  Use Sample Data
+                                </Button>
+                              )}
+                            </div>
+
+                            {uploadedFiles.length === 0 && !useMockData && !debugMode && (
+                              <p className="text-red-500 text-xs mt-3">Please upload files first</p>
+                            )}
+                            
+                          </div>
+                        </div>
+                      )}
+
+                      {isGenerating && (
+                        <div className="space-y-6">
+                          <div className="text-center">
+                            <div className="inline-flex items-center space-x-3 bg-sky-50 px-5 py-3 rounded-lg">
+                              <Loader2 className="h-5 w-5 text-sky-600 animate-spin" />
+                              <span className="text-sky-600 font-medium text-sm">Generating your assignment...</span>
+                            </div>
+                          </div>
+
+                          <Progress value={generationProgress} className="h-2" />
+
+                          <p className="text-slate-600 text-sm text-center">
+                            Please be patient, this may take a few minutes.
+                          </p>
+
+                          {debugMode && (
+                            <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                              <h4 className="text-xs font-semibold text-slate-700 mb-2">Debug Information</h4>
+                              <div className="space-y-1 text-xs text-slate-600">
+                                <p>API Key Status: {process.env.GOOGLE_GENERATIVE_AI_API_KEY ? "Available" : "Not Found"}</p>
+                                <p>Files Count: {uploadedFiles.length}</p>
+                                <p>Word Count: {generationSettings.wordCount}</p>
+                                <p>Reference Style: {generationSettings.referenceStyle}</p>
+                                <p>Retry Count: {retryCount}</p>
+                                <div className="flex space-x-2 mt-2">
+                                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={useMockDataFallback}>
+                                    Use Sample Data
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {assignmentGenerated && assignments && (
+                        <div className="space-y-6">
+                          <div className="text-center">
+                            <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-3" />
+                            <h3 className="text-xl font-bold text-slate-800 mb-2">Assignment Generated!</h3>
+                            <p className="text-slate-600 text-sm">
+                              Your AI-generated assignment is ready for preview and download.
+                            </p>
+
+                            <div className="mt-6 flex justify-center space-x-3">
+                              <Button onClick={() => setActiveTab("preview")}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                View Assignment
+                              </Button>
+                              <Button variant="outline" onClick={() => handleDownload("docx")}>
+                                <FileText className="mr-2 h-4 w-4" />
+                                Download DOCX
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                {/* assignment Tab Content */}
+                <TabsContent value="assignment">
+                  {assignmentsData ? (
+                    <Table className="">
+                          <TableHeader className="">
+                            <TableRow>
+                              <th className="px-6 py-3 border border-gray-300 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">S.No</th>
+                              <th className="px-6 py-3 border border-gray-300 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                              <th className="px-6 py-3 border border-gray-300  text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                      {
+                        assignmentsData.map((assignment:any,index) => (
+                          <TableRow key={assignment.id}>
+                            <td className="px-6 border border-gray-300 py-4 whitespace-nowrap text-sm text-gray-700">{index + 1}</td>
+                            <td className="px-6 border border-gray-300 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{assignment.title}</td>
+                            <td className="px-6 border border-gray-300 py-4 whitespace-nowrap text-sm text-right space-x-2">
+                              <Button
+                                variant="outline"
+                                className="cursor-pointer"
+                                onClick={() => {
+                                  setAssignmentPreview(true);
+                                  setAssignmentPreviewData(assignment);
+                                  setActiveTab("preview");
+                                }}
+                              >
+                                Preview
+                              </Button>
+                            </td>
+                          </TableRow>
+                        ))
+                      }
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="text-center py-24">
+                      <FileText className="mx-auto h-12 w-12 text-slate-300 mb-3" />
+                      <p className="text-slate-500 text-sm">No assignment generated yet</p>
+                      <p className="text-slate-400 text-xs mt-1">Generate an assignment to preview it here</p>
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* Preview Tab Content */}
+                <TabsContent value="preview">
+                  {/* {assignmentPreview && assignmentPreviewData ? (
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xl font-bold text-slate-800">Assignment Preview</h3>
+                        <div className="flex items-center space-x-3">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="outline" className="cursor-pointer" size="sm" onClick={() => handleDownload("copy")}>
+                                  <Copy className="h-4 w-4 mr-2" />
+                                  {copied ? "Copied !" : "Copy Text"}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Copy the assignment text to clipboard</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <Button variant="outline" className="cursor-pointer" size="sm" onClick={() => handleDownload("txt")}>
+                            Download TXT
+                          </Button>
+                          <Button variant="outline" className="cursor-pointer" size="sm" onClick={() => handleDownload("html")}>
+                            Download HTML
+                          </Button>
+                          <Button variant="outline" className="cursor-pointer" size="sm" onClick={() => handleDownload("docx")}>
+                            Download DOCX
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+                        <ScrollArea className="h-[500px] pr-4">
+                          <div className="p-6 prose max-w-none">
+                            <h2 className="text-2xl font-bold text-center mb-4">{assignmentPreviewData?.title}</h2>
+                            {assignmentPreviewData?.sections &&
+                              assignmentPreviewData?.sections.map((section) => (
+                                <div key={section.id} className="mb-8">
+                                  <div className="flex justify-between items-center">
+                                    <h4 className="text-lg font-semibold text-slate-800 mb-3">{section.title}</h4>
+                                    <Button variant="outline" className="cursor-pointer" onClick={() => {
+                                      setIsShowSection(!isShowSection);
+                                      setSectionData(section);
+                                    }}>Edit</Button>
+                                  </div>
+                                  {section.content.split("\n\n").map((paragraph, idx) => (
+                                    <p key={idx} className="text-slate-700 mb-4">
+                                      {paragraph}
+                                    </p>
+                                  ))}
+                                </div>
+                              ))}
+                          </div>
+                        </ScrollArea>
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                        <Button variant="outline" onClick={() => {
+                          setFilteredFile(null)
+                          setAssignmentPreview(false)
+                          setAssignmentPreviewData(null)
+                          setApiResponse(null)
+                          setActiveTab("upload")
+                        }}>
+                          Generate New Assignemts
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-24">
+                      <FileText className="mx-auto h-12 w-12 text-slate-300 mb-3" />
+                      <p className="text-slate-500 text-sm">No assignment generated yet</p>
+                      <p className="text-slate-400 text-xs mt-1">Generate an assignment to preview it here</p>
+                    </div>
+                  )} */}
+
+                  {
+                    assingmentGenResponse && (
+                      <>
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xl font-bold text-slate-800">Assignment Preview</h3>
+                        <div className="flex items-center space-x-3">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="outline" className="cursor-pointer" size="sm" onClick={() => handleDownload("copy")}>
+                                  <Copy className="h-4 w-4 mr-2" />
+                                  {copied ? "Copied !" : "Copy Text"}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Copy the assignment text to clipboard</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <Button variant="outline" className="cursor-pointer" size="sm" onClick={() => handleDownload("txt")}>
+                            Download TXT
+                          </Button>
+                          <Button variant="outline" className="cursor-pointer" size="sm" onClick={() => handleDownload("pdf")}>
+                            Download PDF
+                          </Button>
+                          <Button variant="outline" className="cursor-pointer" size="sm" onClick={() => handleDownload("docx")}>
+                            Download DOCX
+                          </Button>
+                        </div>
+                      </div>
+                        <div className="my-3">
+                          <h2 className="font-bold text-lg lg:text-2xl">{data?.topic}</h2>
+                          {/* <div className="mt-3 flex items-center gap-4"><h3 className="text-lg font-bold lg:text-2xl">{data?.university_name}</h3> </div> */}
+                        </div>
+                        {Object.entries(assingmentGenResponse?.polished_assignment)
+                          .filter(([key]) => key !== "references") // Exclude references
+                          .map(([key, section]) => (
+                            <div key={key} className="mb-6">
+                              <h2 className="text-xl font-bold mb-2">{section.heading}</h2>
+
+                              {/* If content is a string, render it as a paragraph */}
+                              {typeof section.content === "string" ? (
+                                <p className="text-gray-800 whitespace-pre-line">{section.content}</p>
+                              ) : (
+                                // If content is an object, map over its entries
+                                Object.entries(section.content).map(([subKey, subSection]) => (
+                                  <div key={subKey} className="ml-4 mb-4">
+                                    <h3 className="text-lg font-semibold mb-1">{subSection.heading}</h3>
+                                    <p className="text-gray-700 whitespace-pre-line">{subSection.content}</p>
+                                  </div>
+                                ))
+                              )}
+                            </div>
                         ))}
-                    </div>
-                  </ScrollArea>
-                </div>
+                        <div className="">
+                          <h1 className="text-lg lg:text-2xl font-bold mb-2">References</h1>
+                          <ul className="list-disc list-inside">
+                            {assingmentGenResponse?.polished_assignment?.references.map((item,index) => (
+                              <li key={index}>{item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </>
+                    )
+                  }
+                </TabsContent>
 
-                <div className="flex justify-between items-center">
-                  <Button variant="outline" onClick={() => {
-                    setFilteredFile(null)
-                    setAssignmentPreview(false)
-                    setAssignmentPreviewData(null)
-                    setApiResponse(null)
-                    setActiveTab("upload")
-                  }}>
-                    Generate New Assignemts
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-24">
-                <FileText className="mx-auto h-12 w-12 text-slate-300 mb-3" />
-                <p className="text-slate-500 text-sm">No assignment generated yet</p>
-                <p className="text-slate-400 text-xs mt-1">Generate an assignment to preview it here</p>
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Chat Tab Content */}
-          <TabsContent value="chat">
-            <div className="space-y-4">
-              <div
-                ref={chatContainerRef}
-                className="h-[500px] p-4 bg-slate-50 rounded-lg border border-slate-200 overflow-y-auto"
-              >
-                {messages.length === 0 ? (
-                  <div className="text-center py-24">
-                    <MessageSquare className="mx-auto h-12 w-12 text-slate-300 mb-3" />
-                    <p className="text-slate-500 text-sm">No messages yet</p>
-                    <p className="text-slate-400 text-xs mt-1">Start a conversation to get help</p>
-                  </div>
-                ) : (
-                  messages.map((message, index) => (
+                {/* Chat Tab Content */}
+                <TabsContent value="chat">
+                  <div className="space-y-4">
                     <div
-                      key={index}
-                      className={`mb-3 p-3 rounded-lg ${message.role === "user" ? "bg-blue-100" : "bg-slate-100"}`}
+                      ref={chatContainerRef}
+                      className="h-[500px] p-4 bg-slate-50 rounded-lg border border-slate-200 overflow-y-auto"
                     >
-                      <p className="text-sm text-slate-800">{message.content}</p>
+                      {questionsAnswers.length === 0 ? (
+                        <div className="text-center py-24">
+                          <MessageSquare className="mx-auto h-12 w-12 text-slate-300 mb-3" />
+                          <p className="text-slate-500 text-sm">No messages yet</p>
+                          <p className="text-slate-400 text-xs mt-1">Start a conversation to get help</p>
+                        </div>
+                      ) : (
+                        questionsAnswers.map((message, index) => (
+                          <>
+                          <div
+                            key={index}
+                            className={`mb-3 p-3 rounded-lg ${message.question ? "bg-blue-100" : "bg-slate-100"}`}
+                          >
+                            <p className="text-sm text-slate-800">{message.question}</p>
+                          </div>
+                          <div
+                            key={index}
+                            className={`mb-3 p-3 rounded-lg ${message.answer ? "bg-blue-300" : "bg-slate-100"}`}
+                          >
+                            <p className="text-sm text-slate-800">{message.answer}</p>
+                          </div>
+
+                          </>
+                        ))
+                      )}
+
+                      {isLoading && (
+                        <div className="mb-3 p-3 rounded-lg bg-slate-100">
+                          <Loader2 className="h-4 w-4 text-slate-600 animate-spin mr-2 inline-block" />
+                          <span className="text-sm text-slate-800">Thinking...</span>
+                        </div>
+                      )}
                     </div>
-                  ))
-                )}
 
-                {isLoading && (
-                  <div className="mb-3 p-3 rounded-lg bg-slate-100">
-                    <Loader2 className="h-4 w-4 text-slate-600 animate-spin mr-2 inline-block" />
-                    <span className="text-sm text-slate-800">Thinking...</span>
+                    <div className="flex items-center space-x-3">
+                      <Input
+                        type="text"
+                        placeholder="Ask a question about the assignment..."
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            handleChatSubmit(responseData ? responseData.assignment_id : null);
+                          }
+                        }}
+                      />
+                      <Button onClick={() => handleChatSubmit(responseData ? responseData?.assignment_id : "")} disabled={isProcessingChat}>
+                        {isProcessingChat ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send"}
+                      </Button>
+                    </div>
                   </div>
-                )}
-              </div>
+                </TabsContent>
 
-              <div className="flex items-center space-x-3">
-                <Input
-                  type="text"
-                  placeholder="Ask a question about the assignment..."
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      handleChatSubmit()
-                    }
-                  }}
-                />
-                <Button onClick={handleChatSubmit} disabled={isProcessingChat}>
-                  {isProcessingChat ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send"}
-                </Button>
-              </div>
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
+          </Tabs>
+        </div>
 
 
       {isShowSection && (
         <SectionViewer section={sectionData} onClose={() => setIsShowSection(!isShowSection)} />
       )}
+
     </div>
   )
 }

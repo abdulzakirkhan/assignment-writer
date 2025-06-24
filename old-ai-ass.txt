@@ -1520,3 +1520,67 @@ const AIAssignmentWriter = () => {
 }
 
 export default AIAssignmentWriter
+
+
+
+
+http://192.168.100.127:8000/ingest_assignment
+
+
+
+
+
+
+
+{filteredFile && (
+                        <Card>
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-lg flex items-center">
+                              <FileTextIcon className="h-5 w-5 mr-2 text-violet-600" />
+                              Provided Assignment
+                            </CardTitle>
+                            <CardDescription>Provided reference, papers topic, paper type deadline</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-1 space-y-3">
+                              {/* Paper Topic row */}
+                              <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
+                                <span className="text-sm text-gray-600">Paper Topic</span>
+                                <XCircle className="h-4 w-4 text-red-600" />
+                              </div>
+                              {/* Paper Topic row */}
+                              <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
+                                <span className="text-sm text-gray-600">Assignment Type</span>
+                                <BadgeCheck className="h-4 w-4 text-green-600" />
+                              </div>
+                              {/* Deadline row */}
+                              <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
+                                <span className="text-sm text-gray-600">Deadline</span>
+                                <BadgeCheck className="h-4 w-4 text-green-600" />
+                              </div>
+
+                              {/* Paper Topic row */}
+                              <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
+                                <span className="text-sm text-gray-600">Reference Style</span>
+                                <XCircle className="h-4 w-4 text-red-600" />
+                              </div>
+                              {/* Paper Topic row */}
+                              <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
+                                <span className="text-sm text-gray-600">Word Count</span>
+                                <XCircle className="h-4 w-4 text-red-600" />
+                              </div>
+                              {/* Paper Topic row */}
+                              <div className="flex items-center justify-between border-b-2 border-dashed border-slate-300 pb-1">
+                                <span className="text-sm text-gray-600">Additional Instructions</span>
+                                <BadgeCheck className="h-4 w-4 text-green-600" />
+                              </div>
+
+                              <div className="">
+                                
+                              </div>
+                            </div>
+                          </CardContent>
+                          <CardFooter className="px-6 -mt-5">
+                          </CardFooter>
+                        </Card>
+                      )}

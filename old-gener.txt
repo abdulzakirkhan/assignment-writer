@@ -1,0 +1,221 @@
+  const generateAssignment = async (assignment_id: any) => {
+
+    // Reset error state
+    setApiError(null)
+
+    // Allow generation with no files if using mock data
+    if (uploadedFiles.length === 0 && !useMockData && !debugMode) {
+      toast({
+        title: "No Files",
+        description: "Please upload at least one file before generating an assignment.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsGenerating(true)
+    setGenerationProgress(0)
+
+    // Simulate initial progress
+    const progressInterval = setInterval(() => {
+      setGenerationProgress((prev) => {
+        if (prev >= 90) {
+          clearInterval(progressInterval)
+          return prev
+        }
+        return prev + Math.random() * 2 // Slower progress to avoid jumping to 90% too quickly
+      })
+    }, 800)
+
+    try {
+
+      // Prepare headers for the request
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      }
+
+      // If debug mode is enabled and user clicked "Use Test Data", add a special header
+      if (debugMode && useMockData) {
+        headers["x-use-mock-data"] = "true"
+      }
+
+      // If we've had API errors and are in debug mode, use mock data as fallback
+      if (apiError && debugMode) {
+        const mockAssignment = generateMockAssignment(generationSettings.referenceStyle, generationSettings.wordCount)
+
+        // Set generation progress to 100%
+        setGenerationProgress(100)
+
+        // Update state
+        setAssignments(mockAssignment)
+        setAssignmentGenerated(true)
+
+        // Switch to preview tab
+        setTimeout(() => {
+          setActiveTab("preview")
+          setIsGenerating(false)
+        }, 1000)
+
+        toast({
+          title: "Assignment Generated (Mock Data)",
+          description: "Using sample data due to API issues. This is for demonstration purposes only.",
+        })
+
+        clearInterval(progressInterval)
+        return
+      }
+
+      
+
+      const response = await fetch("/api/generate-assignment", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          files: uploadedFiles,
+          settings: generationSettings,
+          wordCount: generationSettings.wordCount,
+          referenceStyle: generationSettings.referenceStyle,
+          additionalInstructions: generationSettings.additionalInstructions,
+          copies: generationSettings.copies,
+        }),
+      })
+      // return
+      setApiResponse(response)
+      // return
+
+      // Handle non-OK responses
+      if (!response.ok) {
+        let errorMessage = `Error: ${response.status}`
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.details || errorData.error || errorMessage
+        } catch (e) {
+          // If we can't parse the error as JSON, just use the status code
+        }
+
+        // Set the API error state
+        setApiError(errorMessage)
+
+        throw new Error(errorMessage)
+      }
+
+      // Parse the response
+      const result = await response.json()
+
+      // Set generation progress to 100%
+      setGenerationProgress(100)
+
+      // Process the assignment data
+      const assignmentData = {
+        ...result,
+        createdAt: new Date(result.createdAt || new Date()),
+        format: "DOCX",
+        referenceStyle: result.referenceStyle || generationSettings.referenceStyle,
+      }
+
+      // Update state
+      setAssignments(assignmentData)
+      setAssignmentGenerated(true)
+
+      // Switch to preview tab
+      setTimeout(() => {
+        setActiveTab("preview")
+        setIsGenerating(false)
+      }, 1000)
+
+      toast({
+        title: "Assignment Generated",
+        description: "Your assignment has been successfully generated!",
+      })
+    } catch (error) {
+
+      clearInterval(progressInterval)
+      setIsGenerating(false)
+
+      // Show error toast
+      toast({
+        title: "Generation Failed",
+        description: error instanceof Error ? error.message : "Failed to generate the assignment. Please try again.",
+        variant: "destructive",
+        action: (
+          <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setRetryCount((prev) => prev + 1)
+                generateAssignment()
+              }}
+            >
+              <RefreshCw className="h-4 w-4 mr-1" />
+              Retry
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setUseMockData(true)
+                generateAssignment()
+              }}
+            >
+              Use Sample Data
+            </Button>
+          </div>
+        ),
+      })
+
+      // If we're in debug mode, offer to use mock data
+      if (debugMode) {
+        toast({
+          title: "Try Mock Data",
+          description: "Click 'Use Test Data' in the debug panel to generate a sample assignment.",
+          action: (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setUseMockData(true)
+                generateAssignment()
+              }}
+            >
+              Use Test Data
+            </Button>
+          ),
+        })
+      }
+    }
+  }
+
+
+
+
+
+    const handleChatSubmit = async (assignment_id : string) => {
+    if (!chatInput.trim() || isProcessingChat) return
+
+    setIsProcessingChat(true)
+
+    try {
+      // await append({
+      //   role: "user",
+      //   content: chatInput,
+      // })
+
+      // setChatInput("")
+      const payload ={
+        question:chatInput
+      }
+      const response =await fetch(`${baseUrl}/qna/${assignment_id}`, {
+        method: "POST",
+        body:payload
+      }
+    } catch (error) {
+      // setIsProcessingChat(false)
+
+      // toast({
+      //   title: "Chat Error",
+      //   description: "Failed to send message. Please try again.",
+      //   variant: "destructive",
+      // })
+    }
+  }

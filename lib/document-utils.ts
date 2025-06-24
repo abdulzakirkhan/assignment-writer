@@ -1,5 +1,6 @@
 import type { AssignmentDetails } from "@/types/assignment"
-
+import { jsPDF } from "jspdf"
+import autoTable from "jspdf-autotable"
 export const generateDocumentContent = (assignment: AssignmentDetails): string => {
   const formatDate = (date: Date) => {
     return date.toLocaleDateString("en-US", {
@@ -27,13 +28,6 @@ ${section.content}
 `,
   )
   .join("\n")}
-
----
-Document Statistics:
-- Total Word Count: ${assignment.wordCount}
-- Total Sections: ${assignment.sections.length}
-- Reference Style: ${assignment.referenceStyle}
-- Generated: ${formatDate(assignment.createdAt)}
 `
 
   return content.trim()
@@ -129,11 +123,7 @@ export const downloadAsHTML = (assignment: AssignmentDetails) => {
       )
       .join("")}
 
-    <div class="footer">
-        <p><strong>Document Statistics:</strong></p>
-        <p>Total Word Count: ${assignment.wordCount} | Total Sections: ${assignment.sections.length} | Reference Style: ${assignment.referenceStyle}</p>
-        <p>Generated: ${assignment.createdAt.toLocaleDateString()}</p>
-    </div>
+
 </body>
 </html>`
 
@@ -221,27 +211,27 @@ export const downloadAsDocx = async (assignment: AssignmentDetails) => {
   })
 
   // Add footer
-  children.push(
-    new Paragraph({
-      text: "Document Statistics",
-      heading: HeadingLevel.HEADING_2,
-      spacing: { before: 400, after: 200 },
-    }),
-  )
+  // children.push(
+  //   new Paragraph({
+  //     text: "Document Statistics",
+  //     heading: HeadingLevel.HEADING_2,
+  //     spacing: { before: 400, after: 200 },
+  //   }),
+  // )
 
-  children.push(
-    new Paragraph({
-      text: `Total Word Count: ${assignment.wordCount} | Total Sections: ${assignment.sections.length}`,
-      spacing: { after: 200 },
-    }),
-  )
+  // children.push(
+  //   new Paragraph({
+  //     text: `Total Word Count: ${assignment.wordCount} | Total Sections: ${assignment.sections.length}`,
+  //     spacing: { after: 200 },
+  //   }),
+  // )
 
-  children.push(
-    new Paragraph({
-      text: `Reference Style: ${assignment.referenceStyle} | Generated: ${assignment.createdAt.toLocaleDateString()}`,
-      spacing: { after: 200 },
-    }),
-  )
+  // children.push(
+  //   new Paragraph({
+  //     text: `Reference Style: ${assignment.referenceStyle} | Generated: ${assignment.createdAt.toLocaleDateString()}`,
+  //     spacing: { after: 200 },
+  //   }),
+  // )
 
   // Create document
   const doc = new Document({
@@ -285,4 +275,79 @@ export const copyToClipboard = async (assignment: AssignmentDetails): Promise<bo
     console.error("Failed to copy to clipboard:", error)
     return false
   }
+}
+
+
+export const downloadAsPdf = (assignment: AssignmentDetails) => {
+  const doc = new jsPDF("p", "pt", "a4")
+  const marginLeft = 40
+  const lineSpacing = 20
+  const pageHeight = doc.internal.pageSize.height
+
+  let cursorY = 60
+
+  // Title
+  doc.setFontSize(20)
+  doc.setFont("Helvetica", "bold")
+  doc.text(assignment.title, marginLeft, cursorY, { maxWidth: 520 })
+
+  cursorY += lineSpacing + 10
+
+  // Loop through sections
+  doc.setFontSize(12)
+  assignment.sections.forEach((section, i) => {
+    const estimatedHeight = doc.getTextDimensions(section.content, { maxWidth: 520 }).h
+
+    // Add page if needed
+    if (cursorY + estimatedHeight > pageHeight - 80) {
+      doc.addPage()
+      cursorY = 60
+    }
+
+    // Section Heading
+    doc.setFont("Helvetica", "bold")
+    doc.setFontSize(14)
+    doc.text(section.title, marginLeft, cursorY)
+    cursorY += lineSpacing
+
+    // Section Content
+    doc.setFont("Helvetica", "normal")
+    const splitText = doc.splitTextToSize(section.content, 520)
+    doc.text(splitText, marginLeft, cursorY)
+    cursorY += splitText.length * lineSpacing
+  })
+
+  // If references exist, add them
+  const hasReferences = "references" in assignment && Array.isArray((assignment as any).references)
+  if (hasReferences) {
+    const references = (assignment as any).references as string[]
+
+    if (cursorY + 100 > pageHeight - 60) {
+      doc.addPage()
+      cursorY = 60
+    }
+
+    doc.setFont("Helvetica", "bold")
+    doc.setFontSize(14)
+    doc.text("References", marginLeft, cursorY)
+    cursorY += lineSpacing
+
+    doc.setFont("Helvetica", "normal")
+    doc.setFontSize(12)
+
+    references.forEach((ref: string) => {
+      const splitRef = doc.splitTextToSize(ref, 520)
+      doc.text(splitRef, marginLeft, cursorY)
+      cursorY += splitRef.length * lineSpacing
+
+      if (cursorY > pageHeight - 80) {
+        doc.addPage()
+        cursorY = 60
+      }
+    })
+  }
+
+  // Save the PDF
+  const fileName = `${assignment.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.pdf`
+  doc.save(fileName)
 }

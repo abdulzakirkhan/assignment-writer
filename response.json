@@ -1,0 +1,103 @@
+{
+    "data": {
+        "paper_topic": "Big Data in Organisations",
+        "assignment_type": "Business Report",
+        "deadline": "Monday of week 8 23:59 GMT",
+        "word_count": 3000,
+        "page_count": "",
+        "assignment_parts": [
+            "Introduction",
+            "Application of Big Data",
+            "Challenges and Opportunities",
+            "Strategic and Operational Use of Big Data",
+            "Professional and Ethical Requirements",
+            "Conclusion",
+            "References"
+        ],
+        "software_required": "",
+        "software_version": "",
+        "programming_language_version": "",
+        "data_file_format": "",
+        "execution_environment": "",
+        "expected_output": "PDF file",
+        "integration_tools": "",
+        "dataset_mentioned": "",
+        "university_name": "University of Sunderland",
+        "citation_style": "Harvard",
+        "total_references_required": "6-10",
+        "_rubric_json": {
+            "main_criteria": [
+                {
+                    "criterion_title": "Introduction",
+                    "mark_allocation": "10%"
+                },
+                {
+                    "criterion_title": "Application of Big Data",
+                    "mark_allocation": "20%"
+                },
+                {
+                    "criterion_title": "Challenges and Opportunities",
+                    "mark_allocation": "20%"
+                },
+                {
+                    "criterion_title": "Strategic and Operational Use of Big Data",
+                    "mark_allocation": "20%"
+                },
+                {
+                    "criterion_title": "Professional and Ethical Requirements",
+                    "mark_allocation": "20%"
+                },
+                {
+                    "criterion_title": "Conclusion",
+                    "mark_allocation": "10%"
+                }
+            ],
+            "grade_boundaries": [
+                {
+                    "grade": "86 – 100%",
+                    "threshold": "Exemplary work with complete grasp of knowledge, understanding, and skills; all learning outcomes satisfied; compelling evaluation, originality, and elegance of argument."
+                },
+                {
+                    "grade": "76 – 85%",
+                    "threshold": "Excellent work with comprehensive knowledge and skills; all learning outcomes satisfied; excellent evaluation and elegance of argument."
+                },
+                {
+                    "grade": "70 – 75%",
+                    "threshold": "High standard work with comprehensive knowledge and skills; all learning outcomes satisfied; high standard of evaluation and argument."
+                },
+                {
+                    "grade": "60 – 69%",
+                    "threshold": "Directly relevant to assessment requirements; substantial knowledge; comprehensive analysis; well-supported argument; distinctive thinking."
+                },
+                {
+                    "grade": "50 – 59%",
+                    "threshold": "Addresses assessment requirements; adequate knowledge; significant analytical treatment; coherent and logically structured."
+                },
+                {
+                    "grade": "40 – 49%",
+                    "threshold": "Some correlation with assessment requirements; basic understanding; some analytical treatment; coherent argument."
+                },
+                {
+                    "grade": "35 – 39%",
+                    "threshold": "Intermittent relevance; limited understanding; largely descriptive or narrative; basic argument evident."
+                },
+                {
+                    "grade": "30 – 34%",
+                    "threshold": "Insufficient evidence of knowledge, understanding, and skills; some learning outcomes satisfied; weak in several indicators."
+                },
+                {
+                    "grade": "15 – 29%",
+                    "threshold": "Unacceptable work with little evidence of knowledge; few learning outcomes satisfied; weak in several indicators."
+                },
+                {
+                    "grade": "0 – 14%",
+                    "threshold": "Almost no evidence of knowledge, understanding, and skills; fails to satisfy learning outcomes; weak in majority or all indicators."
+                }
+            ],
+            "performance_levels": []
+        },
+        "assignment_id": 89
+    },
+    "message": "Assignment data and draft generated and stored.",
+    "status": "complete"
+}
