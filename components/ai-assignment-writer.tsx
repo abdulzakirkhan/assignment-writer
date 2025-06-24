@@ -204,6 +204,7 @@ const AIAssignmentWriter = () => {
     [key: string]: any;
   };
 
+
   type section = {
     content:{}
   }
@@ -414,9 +415,9 @@ const convertPolishedAssignmentToDetails = (data: any): AssignmentDetails => {
     setActiveTab("generate")
 
     // Simulate regeneration
-    setTimeout(() => {
-      generateAssignment()
-    }, 1000)
+    // setTimeout(() => {
+    //   generateAssignment()
+    // }, 1000)
   }
 
   // Scroll to bottom of chat when new messages arrive
@@ -1005,7 +1006,7 @@ const convertPolishedAssignmentToDetails = (data: any): AssignmentDetails => {
                                   onClick={() => {
                                     setApiError(null)
                                     setRetryCount((prev) => prev + 1)
-                                    generateAssignment()
+                                    // generateAssignment()
                                   }}
                                 >
                                   <RefreshCw className="h-3.5 w-3.5 mr-1" />
@@ -1476,9 +1477,11 @@ const convertPolishedAssignmentToDetails = (data: any): AssignmentDetails => {
                         <div className="">
                           <h1 className="text-lg lg:text-2xl font-bold mb-2">References</h1>
                           <ul className="list-disc list-inside">
-                            {assingmentGenResponse?.polished_assignment?.references.map((item,ref) => (
+                            {assingmentGenResponse?.polished_assignment?.references.map(
+                              (item: string, ref: number) => (
                               <li key={ref}>{item}</li>
-                            ))}
+                              )
+                            )}
                           </ul>
                         </div>
                       </>
