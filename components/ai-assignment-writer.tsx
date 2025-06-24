@@ -62,8 +62,6 @@ import Image from "next/image";
 import Loader from "./Loader";
 import { v4 as uuidv4 } from 'uuid';
 import {data} from './data.js';
-import "katex/dist/katex.min.css";
-import { BlockMath ,InlineMath} from 'react-katex';
 const AIAssignmentWriter = () => {
   const { toast } = useToast()
   const chatContainerRef = useRef<HTMLDivElement>(null)
