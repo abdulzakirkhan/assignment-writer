@@ -280,11 +280,21 @@ const AIAssignmentWriter = () => {
 };
 
 type AssignmentDetails = {
+  id:string,
   title: string;
   createdAt: Date;
   wordCount: number;
   referenceStyle: string;
+  pageCount:number,
+  format:any ,
+  references: any,
   sections: AssignmentSection[];
+};
+type handleDownloadData = {
+  res: any;
+  pdfres: any;
+  docxres: any;
+  assignmentDetails: any;
 };
 
 const convertPolishedAssignmentToDetails = (data: any): AssignmentDetails => {
@@ -316,23 +326,29 @@ const convertPolishedAssignmentToDetails = (data: any): AssignmentDetails => {
   });
 
   // Handle references
+  let references: string[] = [];
   if (Array.isArray(assignment.references)) {
+    references = assignment.references;
     sectionsArray.push({
       title: "References",
       content: assignment.references.join("\n"),
     });
   }
 
-  // Final output
+  // Final output with all required fields
   return {
+    id: data?.assignment_id || "1",
     title: `Assignment on ${data.topic}`,
     createdAt: new Date(),
     wordCount: sectionsArray.reduce(
       (sum, section) => sum + section.content.split(/\s+/).length,
       0
     ),
-    referenceStyle: "Harvard",
+    referenceStyle: data?.citation_style || "Harvard",
     sections: sectionsArray,
+    pageCount: data?.pageCount || 1,
+    format: data?.format || "DOCX",
+    references: references,
   };
 };
 
@@ -352,23 +368,20 @@ const convertPolishedAssignmentToDetails = (data: any): AssignmentDetails => {
             : `Preparing your assignment for download as ${format.toUpperCase()}.`,
       })
 
+      const assDetails : any = convertPolishedAssignmentToDetails(data)
+
       switch (format) {
         case "txt":
-          const res = convertPolishedAssignmentToDetails(data)
-          console.log("res :",res)
-          downloadAsText(res)
+          downloadAsText(assDetails)
           break
         case "pdf":
-          const pdfres =convertPolishedAssignmentToDetails(data)
-          downloadAsPdf(pdfres)
+          downloadAsPdf(assDetails)
           break
         case "docx":
-          const docxres= convertPolishedAssignmentToDetails(data)
-          await downloadAsDocx(docxres)
+          await downloadAsDocx(assDetails)
           break
         case "copy":
-        const assignmentDetails = convertPolishedAssignmentToDetails(data);
-        const success = await copyToClipboard(assignmentDetails);
+        const success = await copyToClipboard(assDetails);
         if (success) {
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
@@ -729,6 +742,30 @@ const convertPolishedAssignmentToDetails = (data: any): AssignmentDetails => {
   };
 
 
+  const handleRefineText = async () => {
+    try {
+      const assignmentText=convertPolishedAssignmentToDetails(data)
+      const formData = new FormData();
+      formData.append("topic",data?.topic)
+      formData.append("assignment_id", String(data?.assignment_id))
+      formData.append("university_name",data?.university_name)
+      formData.append("assignment_text", String(assignmentText))
+      // formData.append("polished_assignment",data.polished_assignment)
+      const response = await fetch(`${baseUrl}/refineText`, {
+        method: "POST",
+        body: formData,
+      });
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+      const resData = await response.json();
+      console.log(resData)
+    } catch (error) {
+      console.log("error :",error)
+    }
+  }
+  console.log("assingmentGenResponse :",assingmentGenResponse)
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-blue-50">
       {/* Header */}
@@ -758,17 +795,17 @@ const convertPolishedAssignmentToDetails = (data: any): AssignmentDetails => {
       </header>
 
         {loading && (
-          <Loader text={"Generating Assignment"} />
+          <Loader text={"Procccess Documents"} />
         )}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
           {/* Main Tabs */}
           <Tabs defaultValue="upload" value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid grid-cols-5 w-full max-w-3xl mx-auto mb-8">
-              <TabsTrigger value="upload" className="flex items-center space-x-2">
+              <TabsTrigger value="upload" className="flex cursor-pointer items-center space-x-2">
                 <Upload className="h-4 w-4" />
                 <span>Upload</span>
               </TabsTrigger>
-              <TabsTrigger value="generate" disabled={responseData ? false : true} className="flex items-center space-x-2">
+              <TabsTrigger value="generate" disabled={responseData ? false : true} className="flex cursor-pointer items-center space-x-2">
                 <FileText className="h-4 w-4" />
                 <span>Generate</span>
               </TabsTrigger>
@@ -776,11 +813,11 @@ const convertPolishedAssignmentToDetails = (data: any): AssignmentDetails => {
                 <FileText className="h-4 w-4" />
                 <span>Assingment</span>
               </TabsTrigger> */}
-              <TabsTrigger value="preview" disabled={assingmentGenResponse ? false : true}  className="flex items-center space-x-2">
+              <TabsTrigger value="preview" disabled={data ? false :true} className="flex cursor-pointer items-center space-x-2">
                 <Eye className="h-4 w-4" />
                 <span>Preview</span>
               </TabsTrigger>
-              <TabsTrigger value="chat" disabled={assingmentGenResponse ? false : true} className="flex items-center space-x-2">
+              <TabsTrigger value="chat" disabled={assingmentGenResponse ? false : true} className="flex cursor-pointer items-center space-x-2">
                 <MessageSquare className="h-4 w-4" />
                 <span>Q&A Chat</span>
               </TabsTrigger>
@@ -960,8 +997,8 @@ const convertPolishedAssignmentToDetails = (data: any): AssignmentDetails => {
                       <textarea rows={5} value={additionalInformation} onChange={(e) => setAdditionalInformation(e.target.value)} placeholder="Additional Information" className="w-full p-2 border border-gray-300 rounded-md focus:border-gray-500 outline-0" style={{resize:"none"}} />
                     </div>
                   </div>
-                  <div className="flex items-center justify-center py-8">
-                    {assignmentFile && moduleMaterialFile &&  (
+                  <div className="flex items-center justify-center pt-2">
+                    {assignmentFile && moduleMaterialFile && !responseData && (
                       <Button
                         className="bg-gradient-to-r cursor-pointer from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
                         onClick={apiCall}
@@ -969,7 +1006,10 @@ const convertPolishedAssignmentToDetails = (data: any): AssignmentDetails => {
                         Click To Proccess
                         <ChevronRight className="ml-2 h-4 w-4" />
                       </Button>
-                    ) }         
+                    ) }
+                    {responseData && (
+                      <Button variant="outline" className="cursor-pointer" onClick={() => setActiveTab("generate")}>Next</Button>
+                    )}         
                   </div>
                   </>
                 </TabsContent>
@@ -1023,11 +1063,11 @@ const convertPolishedAssignmentToDetails = (data: any): AssignmentDetails => {
                         </div>
                       )}
                       {isIngestLoading && (
-                        <Loader text={"Save Material Documents To DB"} />
+                        <Loader text={"Ingest to Knowledge Base / Step 1"} />
                       )}
 
                       {isGenerateAssignments && (
-                        <Loader text={"Generating Assignment"} />
+                        <Loader text={"Generate Assignment / Step 2"} />
                       )}
 
                       {!assignmentGenerated && !isGenerating && (
@@ -1199,7 +1239,7 @@ const convertPolishedAssignmentToDetails = (data: any): AssignmentDetails => {
 
                           <div className="text-center">
                             <div className="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-3">
-                              <Button disabled={ingest ? true : false} className="cursor-pointer px-8 py-8 mt-1" variant="outline" onClick={(e) => handleIngest(responseData ? responseData?.assignment_id : assignmentId)}>Ingest</Button>
+                              <Button disabled={ingest ? true : false} className="bg-gradient-to-r cursor-pointer from-emerald-500 to-sky-500 hover:from-emerald-600 hover:to-sky-600 px-8 py-6 h-auto text-base border-0 mt-1" variant="outline" onClick={(e) => handleIngest(responseData ? responseData?.assignment_id : assignmentId)}>Ingest to Knowledge base / step 1</Button>
                               <Button
                                 onClick={() => generateAssignment(responseData ? responseData.assignment_id : null)}
                                 disabled={
@@ -1209,7 +1249,7 @@ const convertPolishedAssignmentToDetails = (data: any): AssignmentDetails => {
                                 className="bg-gradient-to-r cursor-pointer from-emerald-500 to-sky-500 hover:from-emerald-600 hover:to-sky-600 px-8 py-6 h-auto text-base"
                               >
                                 <Zap className="mr-2 h-5 w-5" />
-                                Generate Assignment
+                                Generate Assignment / Step 2
                               </Button>
 
                               {debugMode && (
@@ -1432,54 +1472,98 @@ const convertPolishedAssignmentToDetails = (data: any): AssignmentDetails => {
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
-                          <Button variant="outline" className="cursor-pointer" size="sm" onClick={() => handleDownload("txt")}>
-                            Download TXT
-                          </Button>
-                          <Button variant="outline" className="cursor-pointer" size="sm" onClick={() => handleDownload("pdf")}>
-                            Download PDF
-                          </Button>
-                          <Button variant="outline" className="cursor-pointer" size="sm" onClick={() => handleDownload("docx")}>
-                            Download DOCX
-                          </Button>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="outline" className="cursor-pointer" size="sm" onClick={() => handleDownload("txt")}>
+                                  Download TXT
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Download in TXT</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="outline" className="cursor-pointer" size="sm" onClick={() => handleDownload("pdf")}>
+                                  Download PDF
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Download in PDF</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="outline" className="cursor-pointer" size="sm" onClick={() => handleDownload("docx")}>
+                                  Download DOCX
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Download in DOCX</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </div>
                       </div>
                         <div className="my-3">
-                          <h2 className="font-bold text-lg lg:text-2xl">{data?.topic}</h2>
+                          <h2 className="font-bold text-lg lg:text-2xl">{assingmentGenResponse?.topic}</h2>
                           {/* <div className="mt-3 flex items-center gap-4"><h3 className="text-lg font-bold lg:text-2xl">{data?.university_name}</h3> </div> */}
                         </div>
                         {Object.entries(assingmentGenResponse?.polished_assignment)
-                          .filter(([key]) => key !== "references") // Exclude references
-                        .map(([key, section]) => {
-                          // Type assertion for section
-                          const typedSection = section as { heading: string; content: string | Record<string, any> };
-                          return (
-                            <div key={key} className="mb-6">
-                              <h2 className="text-xl font-bold mb-2">{typedSection.heading}</h2>
+                          .filter(([key]) => key !== "references")
+                          .map(([key, section]) => {
+                            const typedSection = section as {
+                              heading: string;
+                              content: string | Record<string, { heading: string; content: string }>;
+                            };
 
-                              {/* If content is a string, render it as a paragraph */}
-                              {typeof typedSection.content === "string" ? (
-                                <p className="text-gray-800 whitespace-pre-line">{typedSection.content}</p>
-                              ) : (
-                                // If content is an object, map over its entries
-                                Object.entries(typedSection.content).map(([subKey, subSection]) => (
-                                  <div key={subKey} className="ml-4 mb-4">
-                                    <h3 className="text-lg font-semibold mb-1">{subSection.heading}</h3>
-                                    <p className="text-gray-700 whitespace-pre-line">{subSection.content}</p>
-                                  </div>
-                                ))
-                              )}
-                            </div>
-                          );
-                        })}
+                            return (
+                              <div key={key} className="mb-6">
+                                <h2 className="text-xl font-bold mb-2">{typedSection.heading}</h2>
+
+                                {/* If content is a string, render it as a paragraph */}
+                                {typeof typedSection.content === "string" ? (
+                                  <p className="text-gray-800 whitespace-pre-line">
+                                    {typedSection.content}
+                                  </p>
+                                ) : (
+                                  // If content is an object, map over its entries and show subKey (e.g., 2.1, 2.2)
+                                  Object.entries(typedSection.content).map(([subKey, subSection]) => (
+                                    <div key={subKey} className="ml-4 mb-4">
+                                      <h3 className="text-lg font-semibold mb-1 flex gap-2 items-start">
+                                        <span className="text-gray-500 min-w-[3rem]">{subKey}</span>
+                                        <span>{subSection.heading}</span>
+                                      </h3>
+                                      <p className="text-gray-700 whitespace-pre-line">
+                                        {subSection.content}
+                                      </p>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            );
+                          })}
+
                         <div className="">
                           <h1 className="text-lg lg:text-2xl font-bold mb-2">References</h1>
-                          <ul className="list-disc list-inside">
-                            {assingmentGenResponse?.polished_assignment?.references.map(
-                              (item: string, ref: number) => (
-                              <li key={ref}>{item}</li>
-                              )
-                            )}
-                          </ul>
+                            <ul className="list-disc list-inside px-3">
+                              {Object.entries(assingmentGenResponse?.polished_assignment?.references || {}).map(
+                                ([key, value], index) => (
+                                  <li key={index}>
+                                    {value}
+                                  </li>
+                                )
+                              )}
+                            </ul>
+                        </div>
+
+                        <div className="flex justify-end items-center">
+                          <Button variant="outline" className="cursor-pointer" onClick={handleRefineText}>Refine Text</Button>
                         </div>
                       </>
                     )

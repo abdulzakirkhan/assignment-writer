@@ -103,18 +103,9 @@ export const data ={
                 }
             }
         },
-        "references": [
-            "Brynjolfsson, E., & McAfee, A. (2014). The Second Machine Age: Work, Progress, and Prosperity in a Time of Brilliant Technologies. W.W. Norton & Company.",
-            "Chaffey, D. (2015). Digital Business and E-Commerce Management. Pearson Education.",
-            "Davenport, T. H. (2014). Big Data at Work: Dispelling the Myths, Uncovering the Opportunities. Harvard Business Review Press.",
-            "Davenport, T. H., Guha, A., Grewal, D., & Bressgott, T. (2012). How Big Data is Different. MIT Sloan Management Review, 54(1), 22-24.",
-            "Hashem, I. A. T., Yaqoob, I., Anuar, N. B., Mokhtar, S., & Gani, A. (2015). The role of Big Data in smart city. International Journal of Information Management, 36(5), 748-758.",
-            "Kitchin, R. (2014). The Data Revolution: Big Data, Open Data, Data Infrastructures and Their Consequences. Sage.",
-            "Marr, B. (2015). Big Data in Practice: How 45 Successful Companies Used Big Data Analytics to Deliver Extraordinary Results. Wiley.",
-            "McKinsey Global Institute. (2011). Big Data: The Next Frontier for Innovation, Competition, and Productivity.",
-            "Merrill, M. (2017). Big Data and Privacy: A New Era for Data Protection. Harvard Law Review.",
-            "Redman, T. C. (2016). Data Driven: Creating a Data Culture. Harvard Business Review Press.",
-            "Wang, Y., Kung, L. A., & Byrd, T. A. (2016). Big Data in Education: A Review of the Literature. Computers and Education, 122, 90-102."
-        ]
-    }
+        "references":{
+            "heading":"References",
+            "content" :"content"
+        }
+    },
 }

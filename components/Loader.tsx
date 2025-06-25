@@ -3,7 +3,11 @@ import Animations from "../public/assets/animations/Animation.json";
 import Lottie from "lottie-react";
 import Typewriter from 'typewriter-effect';
 
-export default function Loader({text}) {
+interface LoaderProps {
+  text: string;
+}
+
+export default function Loader({ text }: LoaderProps) {
   return (
     <div className="fixed inset-0 z-50 bg-white/80 backdrop-blur-xs flex flex-col items-center justify-center gap-4">
         <div className="w-56">
@@ -13,7 +17,7 @@ export default function Loader({text}) {
             <span>{text}</span>
             <Typewriter
                 options={{
-                    strings: ['This may take a few minutes. Please hold on...'],
+                    strings: ['. Please hold on...'],
                     autoStart: true,
                     loop: true,
                 }}
